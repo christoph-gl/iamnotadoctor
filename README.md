@@ -1,6 +1,38 @@
 # iamnotadoctor
 
-A Next.js, TypeScript, and React-based web application that connects directly to your FTMS-compatible smart trainer and a Bluetooth Heart Rate Monitor via **Web Bluetooth**.
+It all started in December. I bought a smart bike ergometer (a Wahoo Kickr Core 2, to be precise), excited to get some winter miles in. At first, I was thrilled to find a nice, polished cycling app that seemingly did *not* lock everything behind a subscription model. But alas, three months later, the honeymoon phase ended. It turned out it was just a free trial, and they wanted to charge me €20/month just to control my trainer—which, let's be honest, is pretty basic technology. 
+
+I looked at alternatives like Zwift, but honestly, all those flashing numbers, virtual avatars, and gamified UI elements are just way too noisy for my attention-deficit brain (jokingly). I didn't want a 3D video game; I just wanted to ride my bike, control the resistance, look at my metrics, and listen to music or watch a video in peace.
+
+So, I decided to do what any reasonable developer would do: **vibe code my own app.**
+
+(And yes, I named the app **`iamnotadoctor`** because in reality, I actually *am* a doctor—but I absolutely do not want to be held legally responsible for whatever you do with this app, your workouts, your heart rate, or your health stack!)
+
+`iamnotadoctor` is a simple, zero-subscription, local-first web application that connects directly to your FTMS-compatible smart trainer and Bluetooth heart rate monitor using the **Web Bluetooth API**. 
+
+What started as a simple alternative ended up doing **actually much more** than the original app:
+*   **LLM Workout Builder:** A local/open-source LLM can create custom tracks and workouts for you based on simple natural language prompts.
+*   **Broad Format Imports:** Import pre-existing tracks in standard formats (like Zwift ZWO XML).
+*   **Visual Track Extraction:** You can upload a screenshot of a workout chart, or literally just take a photo of a workout profile you drew on paper, and the AI will automatically parse and convert it into a playable track scaled to your profile.
+*   **Adaptive Ride Mode:** Run an adaptive freeride where the LLM constantly monitors your live stats (heart rate, power, cadence) and dynamically rewrites the workout plan to match your needs and fatigue level.
+*   **Voice Control & Mid-Ride Adjustments:** You can talk to the LLM (using voice recordings) during a ride to tell it to make the workout harder, ease up, or change focus, and it will adapt the trainer targets on the fly.
+*   **Deep Post-Ride Analysis:** At the end of every session, you get a detailed LLM-generated analysis of your performance (aerobic decoupling, zone distributions, quality score) and recommended targets.
+
+Because it's open-source and AI-friendly, you don't even need to be a developer to get it running or modify it—you can just point your agent of choice (like OpenClaw, Hermes, or whichever coding assistant you use) to this repository, and let it do the heavy lifting.
+
+---
+
+### 💡 Quick Things to Know Before You Start
+
+*   **Browser Choice:** You **should use Google Chrome** (or an equivalent Chromium-based browser like Edge) for the best Bluetooth connectivity. Web Bluetooth is currently best supported in Chrome. Firefox, Safari, and other browsers do not support Web Bluetooth yet.
+*   **Hardware Compatibility:** It *should* work with most FTMS-compatible smart trainers/ergometers and standard Bluetooth heart rate monitors. However, I’ve only personally checked and tested it with my own setup: a **Wahoo Kickr Core 2** and an Amazfit pulse watch.
+*   **Make it Yours (Zero Dev Effort):** Everyone is free to adapt the app to its will. If you want to change the UI, add features, or adjust how a workout progresses, it's super easy—just tell your AI agent of choice what to do and let it write the code.
+*   **Agentic Health Stack:** If you want, your AI agent can query most of the data from the app. You can have your agent fill in your vitals, retrieve your workout history, and query it regularly to integrate with your broader personal health stack.
+*   **Dev Server vs. Build Server:**
+    *   **Dev Server (`npm run dev`):** This is what you run locally while writing code or letting your agent modify the app. It supports hot-reloading (your changes appear instantly in the browser) and compiles files on the fly, making development fast but the loaded code unoptimized.
+    *   **Build Server (`npm run build`):** This compiles and optimizes the entire app for production, performing optimizations like minification and tree-shaking. It generates a highly optimized production bundle that runs much faster and with less overhead. Use this or `npm run start` once you're done editing and just want to run the app.
+
+---
 
 ## For Local Agents Given This URL
 
