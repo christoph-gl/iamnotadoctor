@@ -26,6 +26,7 @@ Because it's open-source and AI-friendly, you don't even need to be a developer 
 
 *   **Browser Choice:** You **should use Google Chrome** (or an equivalent Chromium-based browser like Edge) for the best Bluetooth connectivity. Web Bluetooth is currently best supported in Chrome. Firefox, Safari, and other browsers do not support Web Bluetooth yet.
 *   **Hardware Compatibility:** It *should* work with most FTMS-compatible smart trainers/ergometers and standard Bluetooth heart rate monitors. However, I’ve only personally checked and tested it with my own setup: a **Wahoo Kickr Core 2** and an Amazfit pulse watch.
+*   **API Key Setup (Required for LLM features):** To use any of the AI-powered features (like workout screenshot extraction, the natural language workout builder, live coaching feedback, adaptive ride mode, or post-ride analysis), you must supply your own private **OpenRouter API key** in a local `.env.local` file. The core trainer control, structured workout player, and local ZWO file imports work completely offline without any API keys.
 *   **Make it Yours (Zero Dev Effort):** Everyone is free to adapt the app to its will. If you want to change the UI, add features, or adjust how a workout progresses, it's super easy—just tell your AI agent of choice what to do and let it write the code.
 *   **Agentic Health Stack:** If you want, your AI agent can query most of the data from the app. You can have your agent fill in your vitals, retrieve your workout history, and query it regularly to integrate with your broader personal health stack.
 *   **Dev Server vs. Build Server:**
@@ -78,13 +79,13 @@ Fresh-agent default path:
    npm install
    ```
 
-2. Optional LLM features:
-   Create a `.env.local` file in the root directory for in-app coaching, summaries, and screenshot imports:
+2. LLM Features & OpenRouter Setup:
+   To enable AI features (workout building, coaching feedback, summaries), you must supply your own private **OpenRouter API key** (or other supported keys). Create a `.env.local` file in the root directory:
    ```
-   LLM_CALLS_API_KEY=your_llm_api_key_here
+   LLM_CALLS_API_KEY=your_private_openrouter_api_key_here
    LLM_CALLS_MODEL=google/gemini-2.5-flash
 
-   WORKOUT_IMAGE_EXTRACTOR_API_KEY=your_image_capable_ai_api_key_here
+   WORKOUT_IMAGE_EXTRACTOR_API_KEY=your_private_openrouter_api_key_here
    WORKOUT_IMAGE_EXTRACTOR_MODEL=google/gemini-2.5-flash
    ```
 
