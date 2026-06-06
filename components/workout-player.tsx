@@ -1756,13 +1756,12 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
             </p>
           )}
         </div>
-      )}
-
-      {/* Telemetry Card - Integrated into Player */}
-      <div className="flex flex-col rounded-md border bg-muted/20 overflow-hidden">
-        <div className="p-4 grid grid-cols-3 gap-4 text-center">
+      )}      {/* Integrated Telemetry & Control Console */}
+      <div className="flex flex-col rounded-md border bg-card shadow-sm overflow-hidden">
+        {/* Telemetry Grid */}
+        <div className="p-4 grid grid-cols-3 gap-4 text-center divide-x divide-border/60">
           <div className="flex flex-col items-center">
-            <span className="text-xs text-muted-foreground uppercase font-semibold h-8 flex flex-col items-center justify-end pb-1 gap-0.5">
+            <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider h-8 flex flex-col items-center justify-end pb-1 gap-0.5">
               <span>Power</span>
               {activeTrainerMode.type === "erg" && (
                 <span className="text-[10px] text-primary normal-case font-medium leading-none">
@@ -1775,17 +1774,17 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
                 </span>
               )}
             </span>
-            <span className="text-2xl font-mono">{power ?? "-"} <span className="text-sm">W</span></span>
+            <span className="text-3xl font-bold font-mono tracking-tight mt-1">{power ?? "-"} <span className="text-sm font-normal text-muted-foreground">W</span></span>
             {isResistanceWorkoutMode && currentTargetPower !== null && typeof power === "number" && (
               <span className={`mt-1 text-xs font-semibold ${Math.abs(power - currentTargetPower) <= Math.max(8, currentTargetPower * 0.05) ? "text-green-400" : power > currentTargetPower ? "text-orange-400" : "text-blue-300"}`}>
                 {power > currentTargetPower ? "+" : ""}{Math.round(power - currentTargetPower)} W
               </span>
             )}
             
-            <div className="h-6 w-full mt-1">
+            <div className="h-6 w-full mt-1.5">
               {upcomingChange && (
                 <div className="flex flex-col items-center w-full max-w-[100px] mx-auto gap-1">
-                  <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                  <div className="w-full h-1 bg-muted rounded-full overflow-hidden">
                     <div 
                       className={`h-full transition-all duration-1000 ease-linear ${upcomingChange.nextTarget > upcomingChange.currentTarget ? 'bg-orange-500' : 'bg-blue-400'}`} 
                       style={{ width: `${(upcomingChange.seconds / 10) * 100}%` }}
@@ -1801,14 +1800,16 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
               )}
             </div>
           </div>
-          <div className="flex flex-col">
-            <span className="text-xs text-muted-foreground uppercase font-semibold h-8 flex flex-col items-center justify-end pb-1">
+          
+          <div className="flex flex-col items-center">
+            <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider h-8 flex flex-col items-center justify-end pb-1">
               Cadence
             </span>
-            <span className="text-2xl font-mono">{cadence ?? "-"} <span className="text-sm">rpm</span></span>
+            <span className="text-3xl font-bold font-mono tracking-tight mt-1">{cadence ?? "-"} <span className="text-sm font-normal text-muted-foreground">rpm</span></span>
           </div>
-          <div className="flex flex-col">
-            <span className="text-xs text-muted-foreground uppercase font-semibold h-8 flex flex-col items-center justify-end pb-1 gap-0.5">
+
+          <div className="flex flex-col items-center">
+            <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider h-8 flex flex-col items-center justify-end pb-1 gap-0.5">
               <span>HR</span>
               {currentHrZone && (
                 <span 
@@ -1820,34 +1821,46 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
               )}
             </span>
             <span 
-              className="text-2xl font-mono"
+              className="text-3xl font-bold font-mono tracking-tight mt-1"
               style={{ color: currentHrZone?.color }}
             >
-              {heartRate ?? "-"} <span className="text-sm opacity-75">bpm</span>
+              {heartRate ?? "-"} <span className="text-sm font-normal opacity-75">bpm</span>
             </span>
           </div>
         </div>
-        <div className="px-4 py-2 bg-muted/40 border-t flex justify-between items-center">
-          <span className="text-xs text-muted-foreground uppercase font-semibold">Active Mode</span>
-          <span className="text-sm font-medium">
-            {activeTrainerMode.type === "none" && <span className="text-muted-foreground">None</span>}
-            {activeTrainerMode.type === "erg" && <span className="text-primary">ERG ({activeTrainerMode.watts} W)</span>}
-            {activeTrainerMode.type === "resistance" && <span className="text-primary">Resistance ({activeTrainerMode.level}%)</span>}
-          </span>
+
+        {/* Active Mode Info Ribbon */}
+        <div className="px-4 py-2 bg-muted/40 border-t flex justify-between items-center text-xs">
+          <div className="flex items-center gap-1.5">
+            <span className="text-muted-foreground font-semibold uppercase tracking-wider">Active Mode:</span>
+            <span className="font-semibold text-foreground">
+              {activeTrainerMode.type === "none" && <span className="text-muted-foreground">None</span>}
+              {activeTrainerMode.type === "erg" && <span className="text-primary">ERG ({activeTrainerMode.watts} W)</span>}
+              {activeTrainerMode.type === "resistance" && <span className="text-primary">Resistance ({activeTrainerMode.level}%)</span>}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-muted-foreground font-semibold uppercase tracking-wider">Time:</span>
+            <span className="font-mono font-bold text-foreground">
+              {formatTime(elapsedSeconds)} <span className="text-muted-foreground font-normal">/ {formatTime(totalDuration)}</span>
+            </span>
+          </div>
         </div>
+
+        {/* Ride Coach Message */}
         {(liveCoachFeedback || liveCoachStatus !== "idle") && (
-          <div className="border-t px-4 py-3">
+          <div className="border-t px-4 py-3 bg-muted/10">
             <div className="mb-1 flex items-center justify-between gap-3">
-              <span className="text-xs font-semibold uppercase text-muted-foreground">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                 Ride Coach
               </span>
               {liveCoachStatus === "checking" && (
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">
-                  Checking
+                <span className="text-[9px] font-bold uppercase tracking-wider text-primary animate-pulse">
+                  Checking...
                 </span>
               )}
               {liveCoachStatus === "error" && (
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-destructive">
+                <span className="text-[9px] font-bold uppercase tracking-wider text-destructive">
                   Offline
                 </span>
               )}
@@ -1865,175 +1878,179 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
             )}
           </div>
         )}
-      </div>
 
-      <div className="flex items-center justify-between bg-muted/20 p-4 rounded-md border mt-2">
-        <div className="flex flex-col">
-          <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Time</span>
-          <span className="font-mono text-xl">{formatTime(elapsedSeconds)} <span className="text-sm text-muted-foreground">/ {formatTime(totalDuration)}</span></span>
-        </div>
-
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          {disabled ? (
-            <p className="text-xs text-red-500 font-medium self-center mr-4">Connect trainer to play</p>
-          ) : null}
-
-          {!adaptive && (
-            <div className="flex items-center gap-2 rounded-md border bg-background/60 px-2 py-1">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Coach
-              </span>
-              <div className="flex rounded-md bg-muted/60 p-0.5">
-                {FIXED_TRACK_COACH_INTERVAL_OPTIONS.map((minutes) => {
-                  const selected = fixedTrackCoachIntervalMinutes === minutes;
-                  return (
-                    <button
-                      key={minutes}
-                      type="button"
-                      onClick={() => setFixedTrackCoachIntervalMinutes(minutes)}
-                      className={`h-7 min-w-9 rounded px-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${
-                        selected
-                          ? "bg-background text-foreground shadow-sm"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                      aria-pressed={selected}
-                      title={`Coach update every ${minutes} minute${minutes === 1 ? "" : "s"}`}
-                    >
-                      {minutes}m
-                    </button>
-                  );
-                })}
+        {/* Bottom Control Bar */}
+        <div className="px-4 py-3 bg-muted/40 border-t flex flex-wrap items-center justify-between gap-3">
+          {/* Left Side: Coach Settings (Inline) */}
+          <div className="flex items-center gap-2">
+            {!adaptive && (
+              <div className="flex items-center gap-1.5 rounded-md border bg-background/60 p-0.5 shadow-sm">
+                <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground px-1.5">
+                  Coach
+                </span>
+                <div className="flex rounded bg-muted/50 p-0.5">
+                  {FIXED_TRACK_COACH_INTERVAL_OPTIONS.map((minutes) => {
+                    const selected = fixedTrackCoachIntervalMinutes === minutes;
+                    return (
+                      <button
+                        key={minutes}
+                        type="button"
+                        onClick={() => setFixedTrackCoachIntervalMinutes(minutes)}
+                        className={`h-6 min-w-8 rounded px-1.5 text-[10px] font-bold transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${
+                          selected
+                            ? "bg-background text-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                        aria-pressed={selected}
+                        title={`Coach update every ${minutes} minute${minutes === 1 ? "" : "s"}`}
+                      >
+                        {minutes}m
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {adaptive && (
-            <div className="flex items-center gap-2 rounded-md border bg-background/60 px-2 py-1">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Rewrite
-              </span>
-              <div className="flex rounded-md bg-muted/60 p-0.5">
-                {ADAPTIVE_REWRITE_INTERVAL_OPTIONS.map((minutes) => {
-                  const selected = adaptiveRewriteIntervalMinutes === minutes;
-                  const label = minutes === null ? "Off" : `${minutes}m`;
-                  const title =
-                    minutes === null
-                      ? "Turn adaptive rewrites and coach speech off"
-                      : `Rewrite adaptive ride every ${minutes} minute${minutes === 1 ? "" : "s"}`;
+            {adaptive && (
+              <div className="flex items-center gap-1.5 rounded-md border bg-background/60 p-0.5 shadow-sm">
+                <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground px-1.5">
+                  Rewrite
+                </span>
+                <div className="flex rounded bg-muted/50 p-0.5">
+                  {ADAPTIVE_REWRITE_INTERVAL_OPTIONS.map((minutes) => {
+                    const selected = adaptiveRewriteIntervalMinutes === minutes;
+                    const label = minutes === null ? "Off" : `${minutes}m`;
+                    const title =
+                      minutes === null
+                        ? "Turn adaptive rewrites and coach speech off"
+                        : `Rewrite adaptive ride every ${minutes} minute${minutes === 1 ? "" : "s"}`;
 
-                  return (
-                    <button
-                      key={minutes ?? "off"}
-                      type="button"
-                      onClick={() => handleAdaptiveRewriteIntervalSelect(minutes)}
-                      className={`h-7 min-w-9 rounded px-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${
-                        selected
-                          ? "bg-background text-foreground shadow-sm"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                      aria-pressed={selected}
-                      title={title}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
+                    return (
+                      <button
+                        key={minutes ?? "off"}
+                        type="button"
+                        onClick={() => handleAdaptiveRewriteIntervalSelect(minutes)}
+                        className={`h-6 min-w-8 rounded px-1.5 text-[10px] font-bold transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${
+                          selected
+                            ? "bg-background text-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                        aria-pressed={selected}
+                        title={title}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-	          {elapsedSeconds > 0 && !isPlaying && (
-	            <Dialog open={isFinishOpen} onOpenChange={setIsFinishOpen}>
-              <DialogTrigger asChild>
-                <Button variant="destructive">Finish & Save</Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-lg rounded-md">
-                <DialogHeader>
-                  <DialogTitle>Finish Session</DialogTitle>
-                  <DialogDescription>
-                    Add rider notes for the post-ride summary.
-                  </DialogDescription>
-                </DialogHeader>
-                <textarea
-                  value={finishComments}
-                  onChange={(event) => setFinishComments(event.target.value)}
-                  placeholder="How did it feel? Fueling, heat, legs, HR strap, anything unusual..."
-                  className="min-h-28 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                />
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsFinishOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button variant="destructive" onClick={handleFinishSession}>
-                    Finish & Save
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-	            </Dialog>
-	          )}
-
-	          {elapsedSeconds > 0 && !isPlaying && (
-	            <Button
-	              onClick={handleDiscardRide}
-	              variant="outline"
-	              size="icon"
-	              className="text-destructive hover:text-destructive"
-	              title="Discard ride"
-	              aria-label="Discard ride"
-	            >
-	              <Trash2 />
-	            </Button>
-	          )}
-
-	          <Button 
-	            onClick={handleStop} 
-            variant="outline" 
-            disabled={elapsedSeconds === 0}
-          >
-            Reset Timer
-          </Button>
-          {adaptive && (
-            <>
-            <Button
-              onClick={startAdaptiveVoiceInstruction}
-              variant={isListeningForAdaptiveInstruction ? "secondary" : "outline"}
-              size="icon"
-              disabled={disabled || !adaptiveRewriteEnabled}
-              className={isListeningForAdaptiveInstruction ? "border-red-500 text-red-600 ring-2 ring-red-500/30" : undefined}
-              title={
-                !adaptiveRewriteEnabled
-                  ? "Adaptive rewrite is off"
-                  : isListeningForAdaptiveInstruction
-                    ? "Stop recording"
-                    : "Record adaptive ride instruction"
-              }
-              aria-label={
-                !adaptiveRewriteEnabled
-                  ? "Adaptive rewrite is off"
-                  : isListeningForAdaptiveInstruction
-                    ? "Stop recording"
-                    : "Record adaptive ride instruction"
-              }
-            >
-              <Mic className={isListeningForAdaptiveInstruction ? "animate-pulse" : undefined} />
-            </Button>
             {isListeningForAdaptiveInstruction && (
-              <div className="flex items-center gap-2 rounded-md border border-red-500/50 bg-red-500/10 px-3 py-1.5 text-sm font-semibold text-red-700">
-                <span className="h-2 w-2 animate-pulse rounded-full bg-red-600" />
-                <span>Recording</span>
+              <div className="flex items-center gap-1.5 rounded-md border border-red-500/30 bg-red-500/5 px-2 py-0.5 text-[10px] font-bold text-red-600">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
+                <span>REC</span>
                 <span className="font-mono">{formatShortDuration(adaptiveVoiceRecordingSeconds)}</span>
               </div>
             )}
-            </>
-          )}
-          <Button 
-            onClick={handlePlayPause}
-            variant={isPlaying ? "secondary" : "default"}
-            disabled={disabled || (!adaptive && elapsedSeconds >= totalDuration)}
-            className="w-24"
-          >
-            {isPlaying ? "Pause" : "Play"}
-          </Button>
+          </div>
+
+          {/* Right Side: Action Buttons */}
+          <div className="flex items-center gap-2">
+            {disabled && (
+              <p className="text-[10px] text-red-500 font-semibold mr-2">Connect trainer to control</p>
+            )}
+
+            {elapsedSeconds > 0 && !isPlaying && (
+              <Dialog open={isFinishOpen} onOpenChange={setIsFinishOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="destructive" size="sm" className="h-8 text-xs font-semibold">Finish & Save</Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-lg rounded-md">
+                  <DialogHeader>
+                    <DialogTitle>Finish Session</DialogTitle>
+                    <DialogDescription>
+                      Add rider notes for the post-ride summary.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <textarea
+                    value={finishComments}
+                    onChange={(e) => setFinishComments(e.target.value)}
+                    placeholder="How did it feel? Fueling, heat, legs, HR strap, anything unusual..."
+                    className="min-h-28 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  />
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsFinishOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button variant="destructive" onClick={handleFinishSession}>
+                      Finish & Save
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            )}
+
+            {elapsedSeconds > 0 && !isPlaying && (
+              <Button
+                onClick={handleDiscardRide}
+                variant="outline"
+                size="icon-sm"
+                className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive shrink-0"
+                title="Discard ride"
+                aria-label="Discard ride"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            )}
+
+            <Button 
+              onClick={handleStop} 
+              variant="outline" 
+              size="sm"
+              className="h-8 text-xs font-semibold"
+              disabled={elapsedSeconds === 0}
+            >
+              Reset Timer
+            </Button>
+
+            {adaptive && (
+              <Button
+                onClick={startAdaptiveVoiceInstruction}
+                variant={isListeningForAdaptiveInstruction ? "secondary" : "outline"}
+                size="icon-sm"
+                className={`h-8 w-8 ${isListeningForAdaptiveInstruction ? "border-red-500 text-red-600 ring-2 ring-red-500/30" : ""}`}
+                disabled={disabled || !adaptiveRewriteEnabled}
+                title={
+                  !adaptiveRewriteEnabled
+                    ? "Adaptive rewrite is off"
+                    : isListeningForAdaptiveInstruction
+                      ? "Stop recording"
+                      : "Record adaptive ride instruction"
+                }
+                aria-label={
+                  !adaptiveRewriteEnabled
+                    ? "Adaptive rewrite is off"
+                    : isListeningForAdaptiveInstruction
+                      ? "Stop recording"
+                      : "Record adaptive ride instruction"
+                }
+              >
+                <Mic className={`h-3.5 w-3.5 ${isListeningForAdaptiveInstruction ? "animate-pulse" : ""}`} />
+              </Button>
+            )}
+
+            <Button 
+              onClick={handlePlayPause}
+              variant={isPlaying ? "secondary" : "default"}
+              size="sm"
+              disabled={disabled || (!adaptive && elapsedSeconds >= totalDuration)}
+              className="h-8 w-20 text-xs font-semibold"
+            >
+              {isPlaying ? "Pause" : "Play"}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

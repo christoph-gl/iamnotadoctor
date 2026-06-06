@@ -783,88 +783,90 @@ export default function App() {
             </DialogContent>
           </Dialog>
         </div>
-
         <div className="flex flex-col gap-4">
-          
-          {/* Device Connection Cards */}
-          <div className="grid grid-cols-1 gap-3">
-            {/* Trainer Card */}
-            <div className="flex flex-col gap-3 p-4 border rounded-md bg-card">
-              <div className="flex items-center justify-between">
-                <h2 className="font-semibold text-base">Smart Trainer</h2>
-                <div className="flex items-center gap-2">
-                  <span className="relative flex h-3 w-3">
-                    {connectionState === "connecting" && (
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
-                    )}
-                    <span className={`relative inline-flex rounded-full h-3 w-3 ${
-                      connectionState === "connected" ? "bg-green-500" :
-                      connectionState === "connecting" ? "bg-yellow-500" :
-                      "bg-red-500"
-                    }`}></span>
-                  </span>
-                  <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    {connectionState}
-                  </span>
+          {/* Devices Card */}
+          <div className="flex flex-col gap-3 p-4 border rounded-md bg-card shadow-sm">
+            <h2 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">Devices</h2>
+            
+            <div className="flex flex-col divide-y divide-border/60">
+              {/* Trainer Row */}
+              <div className="flex items-center justify-between pb-3">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-sm font-bold">Smart Trainer</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="relative flex h-2 w-2">
+                      {connectionState === "connecting" && (
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
+                      )}
+                      <span className={`relative inline-flex rounded-full h-2 w-2 ${
+                        connectionState === "connected" ? "bg-green-500" :
+                        connectionState === "connecting" ? "bg-yellow-500" :
+                        "bg-red-500"
+                      }`}></span>
+                    </span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      {connectionState}
+                    </span>
+                  </div>
                 </div>
+                {connectionState === "disconnected" ? (
+                  <Button onClick={connect} size="sm" className="h-8 px-3 text-xs font-semibold">
+                    Connect
+                  </Button>
+                ) : (
+                  <Button onClick={disconnect} variant="destructive" size="sm" className="h-8 px-3 text-xs font-semibold" disabled={connectionState === "connecting"}>
+                    Disconnect
+                  </Button>
+                )}
               </div>
-              {connectionState === "disconnected" ? (
-                <Button onClick={connect} className="w-full">
-                  Connect Trainer
-                </Button>
-              ) : (
-                <Button onClick={disconnect} variant="destructive" className="w-full" disabled={connectionState === "connecting"}>
-                  Disconnect Trainer
-                </Button>
-              )}
-            </div>
 
-            {/* HRM Card */}
-            <div className="flex flex-col gap-3 p-4 border rounded-md bg-card">
-              <div className="flex items-center justify-between">
-                <h2 className="font-semibold text-base">Heart Rate Monitor</h2>
-                <div className="flex items-center gap-2">
-                  <span className="relative flex h-3 w-3">
-                    {hrConnectionState === "connecting" && (
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
-                    )}
-                    <span className={`relative inline-flex rounded-full h-3 w-3 ${
-                      hrConnectionState === "connected" ? "bg-green-500" :
-                      hrConnectionState === "connecting" ? "bg-yellow-500" :
-                      "bg-red-500"
-                    }`}></span>
-                  </span>
-                  <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    {hrConnectionState}
-                  </span>
+              {/* HRM Row */}
+              <div className="flex items-center justify-between pt-3">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-sm font-bold">Heart Rate Monitor</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="relative flex h-2 w-2">
+                      {hrConnectionState === "connecting" && (
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
+                      )}
+                      <span className={`relative inline-flex rounded-full h-2 w-2 ${
+                        hrConnectionState === "connected" ? "bg-green-500" :
+                        hrConnectionState === "connecting" ? "bg-yellow-500" :
+                        "bg-red-500"
+                      }`}></span>
+                    </span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      {hrConnectionState}
+                    </span>
+                  </div>
                 </div>
+                {hrConnectionState === "disconnected" ? (
+                  <Button onClick={connectHRM} variant="secondary" size="sm" className="h-8 px-3 text-xs font-semibold">
+                    Connect
+                  </Button>
+                ) : (
+                  <Button onClick={disconnectHRM} variant="destructive" size="sm" className="h-8 px-3 text-xs font-semibold" disabled={hrConnectionState === "connecting"}>
+                    Disconnect
+                  </Button>
+                )}
               </div>
-              {hrConnectionState === "disconnected" ? (
-                <Button onClick={connectHRM} variant="secondary" className="w-full">
-                  Connect HRM
-                </Button>
-              ) : (
-                <Button onClick={disconnectHRM} variant="destructive" className="w-full" disabled={hrConnectionState === "connecting"}>
-                  Disconnect HRM
-                </Button>
-              )}
             </div>
           </div>
 
-          <div className="flex flex-col gap-4 p-4 rounded-md border">
+          <div className="flex flex-col gap-4 p-4 rounded-md border bg-card shadow-sm">
             {/* Mode Switcher */}
-            <div className="flex p-1 bg-muted/50 rounded-md">
+            <div className="flex p-0.5 bg-muted/60 rounded-md">
               <button
-                className={`flex-1 py-1.5 text-sm font-medium rounded-sm transition-colors ${
-                  mode === "erg" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
+                className={`flex-1 py-1 text-xs font-bold rounded transition-all ${
+                  mode === "erg" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                 }`}
                 onClick={() => setMode("erg")}
               >
                 ERG Mode (Watts)
               </button>
               <button
-                className={`flex-1 py-1.5 text-sm font-medium rounded-sm transition-colors ${
-                  mode === "resistance" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
+                className={`flex-1 py-1 text-xs font-bold rounded transition-all ${
+                  mode === "resistance" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                 }`}
                 onClick={() => setMode("resistance")}
               >
@@ -875,10 +877,10 @@ export default function App() {
             {/* ERG Mode Controls */}
             {mode === "erg" && (
               <div className="flex flex-col gap-3 animate-in fade-in slide-in-from-bottom-1">
-                <label className="flex flex-col gap-2 font-medium">
-                  <div className="flex justify-between">
+                <label className="flex flex-col gap-1.5 font-medium">
+                  <div className="flex justify-between items-center text-xs font-bold text-muted-foreground uppercase tracking-wider">
                     <span>Target Power</span>
-                    <span className="text-muted-foreground font-mono">{targetPower} W</span>
+                    <span className="text-primary font-mono text-sm font-bold">{targetPower} W</span>
                   </div>
                   <input
                     type="range"
@@ -887,10 +889,10 @@ export default function App() {
                     step="5"
                     value={targetPower}
                     onChange={(e) => setTargetPower(Number(e.target.value))}
-                    className="w-full accent-primary"
+                    className="w-full accent-primary cursor-pointer h-1 bg-muted rounded-lg appearance-none"
                     disabled={connectionState !== "connected"}
                   />
-                  <div className="flex justify-between text-xs text-muted-foreground">
+                  <div className="flex justify-between text-[10px] text-muted-foreground/50 font-semibold">
                     <span>50 W</span>
                     <span>1000 W</span>
                   </div>
@@ -899,16 +901,17 @@ export default function App() {
                 <div className="flex gap-2 items-center">
                   <input 
                     type="number" 
-                    min="0" 
-                    max="2000" 
+                    min="50" 
+                    max="1000" 
                     value={targetPower} 
                     onChange={(e) => setTargetPower(Number(e.target.value))}
-                    className="flex h-9 w-20 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex h-8 w-16 rounded-md border border-input bg-transparent px-2.5 py-1 text-xs font-mono shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                     disabled={connectionState !== "connected"}
                   />
                   <Button 
                     onClick={() => applyTargetPower()} 
-                    className="flex-1"
+                    size="sm"
+                    className="flex-1 h-8 text-xs font-semibold"
                     disabled={connectionState !== "connected"}
                   >
                     {activeTrainerMode.type === "erg" ? "Update Target Power" : "Activate ERG Mode"}
@@ -920,10 +923,10 @@ export default function App() {
             {/* Resistance Mode Controls */}
             {mode === "resistance" && (
               <div className="flex flex-col gap-3 animate-in fade-in slide-in-from-bottom-1">
-                <label className="flex flex-col gap-2 font-medium">
-                  <div className="flex justify-between">
+                <label className="flex flex-col gap-1.5 font-medium">
+                  <div className="flex justify-between items-center text-xs font-bold text-muted-foreground uppercase tracking-wider">
                     <span>Resistance Level</span>
-                    <span className="text-muted-foreground">{resistance}%</span>
+                    <span className="text-primary font-mono text-sm font-bold">{resistance}%</span>
                   </div>
                   <input
                     type="range"
@@ -932,20 +935,21 @@ export default function App() {
                     step="0.5"
                     value={resistance}
                     onChange={(e) => setResistance(Number(e.target.value))}
-                    className="w-full accent-primary"
+                    className="w-full accent-primary cursor-pointer h-1 bg-muted rounded-lg appearance-none"
                     disabled={connectionState !== "connected"}
                   />
                 </label>
 
                 <Button 
                   onClick={() => applyResistance()} 
-                  className="w-full"
+                  size="sm"
+                  className="w-full h-8 text-xs font-semibold"
                   disabled={connectionState !== "connected"}
                 >
                   {activeTrainerMode.type === "resistance" ? "Update Resistance" : "Activate Resistance Mode"}
                 </Button>
-                <p className="text-xs text-muted-foreground text-center">
-                  In resistance mode, power output will scale with your cadence and gearing.
+                <p className="text-[10px] text-muted-foreground/50 text-center font-medium leading-normal">
+                  Power output will scale with your cadence and gearing.
                 </p>
               </div>
             )}
