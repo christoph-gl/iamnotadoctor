@@ -294,6 +294,10 @@ export default function App() {
 
   async function applyResistance(level?: number) {
     const levelToSet = typeof level === "number" ? level : resistance;
+    if (connectionState !== "connected") {
+      setResistance(levelToSet);
+      return;
+    }
     try {
       await setTrainerResistance(levelToSet);
     } catch (e) {
@@ -304,6 +308,10 @@ export default function App() {
   
   async function applyTargetPower(watts?: number) {
     const powerToSet = typeof watts === "number" ? watts : targetPower;
+    if (connectionState !== "connected") {
+      setTargetPower(powerToSet);
+      return;
+    }
     try {
       await setTrainerTargetPower(powerToSet);
     } catch (e) {
@@ -313,6 +321,11 @@ export default function App() {
   }
 
   async function applyWorkoutTargetPower(watts: number) {
+    if (connectionState !== "connected") {
+      setTargetPower(watts);
+      return;
+    }
+
     if (activeTrainerMode.type === "resistance" || mode === "resistance") {
       setTargetPower(watts);
       return;
