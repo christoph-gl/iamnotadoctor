@@ -38,7 +38,7 @@ const adaptiveVoiceCoachTimeoutMs = Math.min(
 const RiderCueSchema = z
   .string()
   .min(1)
-  .describe("One rider-facing coaching comment. No lists, loops, or repeated encouragement.");
+  .describe("One complete rider-facing coaching comment. Use complete sentences. No lists, loops, or repeated encouragement.");
 
 const ActionReasonSchema = z
   .string()
@@ -149,7 +149,7 @@ function toCommand(action: z.infer<typeof LiveCoachActionSchema>): LiveCoachComm
     return {
       id: makeLiveCoachCommandId(),
       type: "send_message",
-      text: text.slice(0, 180),
+      text,
       speak: action.speak,
       reason,
     };
@@ -252,13 +252,37 @@ function sanitizeRiderCue(value: unknown) {
   const normalized = value.replace(/\s+/g, " ").trim();
   if (!normalized) return undefined;
 
-  return normalized.slice(0, 420).trim();
+  const maxLength = 900;
+  if (normalized.length <= maxLength) return normalized;
+
+  const clipped = normalized.slice(0, maxLength);
+  const sentenceEnd = Math.max(
+    clipped.lastIndexOf("."),
+    clipped.lastIndexOf("!"),
+    clipped.lastIndexOf("?")
+  );
+
+  return (sentenceEnd > 120 ? clipped.slice(0, sentenceEnd + 1) : clipped).trim();
 }
 
 function sanitizeLiveCoachAction(action: z.infer<typeof LiveCoachActionSchema>) {
   if ("text" in action) {
     const text = sanitizeRiderCue(action.text);
     if (text) return { ...action, text };
+  }
+
+  return action;
+}
+
+function enableSpeechForFixedTrack(
+  action: z.infer<typeof LiveCoachActionSchema>,
+  intent: "adaptive_plan" | "adaptive_instruction" | "periodic_ride_check" | "ride_start_summary" | "coach_check"
+) {
+  if (
+    (intent === "ride_start_summary" || intent === "periodic_ride_check") &&
+    action.action === "send_message"
+  ) {
+    return { ...action, speak: true };
   }
 
   return action;
@@ -329,6 +353,8 @@ function compactWorkout(value: unknown) {
     elapsedSeconds: compactNumber(workout.elapsedSeconds),
     remainingSeconds: compactNumber(workout.remainingSeconds),
     currentTargetPower: compactNumber(workout.currentTargetPower),
+    currentBlockDurationSeconds: compactNumber(workout.currentBlockDurationSeconds),
+    currentBlockElapsedSeconds: compactNumber(workout.currentBlockElapsedSeconds),
     remainingBlocks: blocks,
     truncated: Boolean(workout.truncated),
   };
@@ -570,7 +596,8 @@ At most 30 blocks. At most 30 minutes total. Keep whole watts.`,
       ),
       maxRetries: 1,
       temperature: intent === "periodic_ride_check" ? 0.55 : 0.2,
-      maxOutputTokens: intent === "adaptive_plan" || intent === "adaptive_instruction" ? 1_800 : 800,
+      maxOutputTokens:
+        intent === "adaptive_plan" || intent === "adaptive_instruction" ? 1_800 : 1_200,
       schema: LiveCoachActionSchema,
       system: `You are the low-latency live ride coach inside a smart trainer web app.
 Return one structured action only. This structured action is executed by the browser as the trainer-control tool call.
@@ -581,12 +608,12 @@ Available executable actions:
 - send_message: rider-facing text only; it does not change trainer load.
 When action is send_message, include a non-empty text field with the exact rider-facing words to display.
 Do not use send_message when the rider clearly asks to change watts or resistance and the snapshot says the trainer is connected.
-For coach_check without a specific rider request, prefer one compact rider-facing comment unless telemetry clearly calls for ERG or resistance adjustment.
-For ride_start_summary during a preplanned workout, return send_message only. Give a coach-like opening in 2 to 3 short sentences: name the workout, summarize the course profile or target-power pattern, say what adaptation or training purpose it serves, and give one thing to watch for early. Do not merely welcome the rider. Do not return set_workout_plan, set_erg_watts, or set_resistance for ride_start_summary.
-For periodic_ride_check during a preplanned workout, return send_message only. Use the rider profile, heart-rate zones, 30-second rolling snapshots, ride-so-far averages, and remainingWorkout to give one coach-like comment about how the ride is going and what to focus on next. Rotate the focus across power versus target, cadence, heart-rate trend, workout progress, the next block, breathing, posture, fueling, and pacing. Do not repeat the topic or phrasing from conversationHistory; especially avoid another "heart rate stable in Zone 2" style line unless HR has clearly changed or matters most right now. Do not return set_workout_plan, set_erg_watts, or set_resistance for periodic_ride_check.
+For coach_check without a specific rider request, prefer one concise but complete rider-facing comment unless telemetry clearly calls for ERG or resistance adjustment.
+For ride_start_summary during a preplanned workout, return send_message only and set speak true. Give a coach-like opening in 2 to 3 short sentences: name the workout, summarize the course profile or target-power pattern, say what adaptation or training purpose it serves, and give one thing to watch for early. Do not merely welcome the rider. Do not return set_workout_plan, set_erg_watts, or set_resistance for ride_start_summary.
+For periodic_ride_check during a preplanned workout, return send_message only and set speak true. Use the rider profile, heart-rate zones, 30-second rolling snapshots, ride-so-far averages, and remainingWorkout (incorporating currentBlockDurationSeconds and currentBlockElapsedSeconds to evaluate heart rate response lag/drift relative to how long the rider has been in the active block) to give one complete coach-like comment about how the ride is going and what to focus on next. Rotate the focus across power versus target, cadence, heart-rate trend, workout progress, the next block, breathing, posture, fueling, and pacing. Do not repeat the topic or phrasing from conversationHistory; especially avoid another "heart rate stable in Zone 2" style line unless HR has clearly changed or matters most right now. Do not return set_workout_plan, set_erg_watts, or set_resistance for periodic_ride_check.
 When rider text is included, treat it as the latest chat message from the rider.
 Use set_workout_plan for requests that mention the workout, track, plan, remaining work, rest of workout, next N minutes, compressing duration, stretching duration, or scaling effort over time.
-snapshot.remainingWorkout.remainingBlocks is the source of truth for the remaining track. It starts at the rider's current point with offsetSeconds 0 and includes durationSeconds and targetPower for each block.
+snapshot.remainingWorkout.remainingBlocks is the source of truth for the remaining track. It starts at the rider's current point with offsetSeconds 0 and includes durationSeconds and targetPower for each block. Use currentBlockDurationSeconds (total duration of the current block) and currentBlockElapsedSeconds (how long the rider has been in the current block) to understand heart rate lag/drift and pacing relative to the active block's timeline.
 For "decrease effort 10% for the rest of the workout", preserve the remaining block durations and return each targetPower multiplied by 0.9, rounded to whole watts.
 For "increase effort 10% for the rest of the workout", preserve durations and multiply each targetPower by 1.1.
 For "compress the rest of the workout to 10 minutes", preserve block order and relative duration proportions, scale total duration to 600 seconds, keep every returned block at least 30 seconds, and merge or omit tiny adjacent blocks if needed.
@@ -595,13 +622,16 @@ set_workout_plan accepts at most 30 blocks and at most 30 minutes total. If the 
 Use leadSeconds 0 to 5 for rider-requested changes so the UI reflects the new plan immediately or near-immediately.
 If intent is adaptive_plan, use snapshot.adaptiveRideIntent as the ride goal. Return set_workout_plan with 5 to 10 blocks covering roughly the requested horizonSeconds. The plan should usually change target watts when telemetry supports a change, not merely describe one. Respect requested duration, heart-rate goals, hard/easy intent, and rider notes over generic workout structure. Include exactly one rider-facing text field that says what changed or held steady, why, and a brief note on the ride so far when telemetry is available. If the plan is effectively unchanged, say that it is holding steady and why. Do not include multiple encouragement phrases, alternatives, slogans, lists, or repeated praise. Keep reason under 120 characters.
 If intent is adaptive_instruction, treat riderText as the rider's spoken instruction for this adaptive freeride. Return update_adaptive_ride. Update durationMinutes when the rider changes length, feedbackIntervalMinutes when they change coach interval, and prompt/riderText when they change intensity, profile, heart-rate goals, constraints, or ride style. Include 5 to 10 immediate blocks when the instruction should change the current plan now. Make text a single useful confirmation of what changed.
-Keep rider-facing text natural and finite: no bullet lists, no duplicated clauses, no looping phrases, no mantra-style repetition, and no more than 3 short sentences unless the rider explicitly asks for detail.
+Keep rider-facing text natural and finite: no bullet lists, no duplicated clauses, no looping phrases, no mantra-style repetition, and no more than 3 short complete sentences unless the rider explicitly asks for detail. Never end the rider-facing text mid-sentence.
 Never mention implementation details, APIs, agents, hooks, or JSON to the rider.
 If the rider reports pain, dizziness, chest pain, or wants to stop, lower intensity or stop escalating and send a safety-first cue.`,
       messages: userContent,
     });
 
-    const action = sanitizeLiveCoachAction(result.object);
+    const action = enableSpeechForFixedTrack(
+      sanitizeLiveCoachAction(result.object),
+      intent
+    );
     const command = toCommand(action);
 
     return NextResponse.json({

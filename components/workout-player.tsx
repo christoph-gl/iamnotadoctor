@@ -91,6 +91,8 @@ type RemainingWorkoutSnapshot = {
   totalDurationSeconds: number;
   remainingSeconds: number;
   currentTargetPower: number | null;
+  currentBlockDurationSeconds: number | null;
+  currentBlockElapsedSeconds: number | null;
   remainingBlocks: Array<{
     offsetSeconds: number;
     durationSeconds: number;
@@ -153,6 +155,11 @@ const DEFAULT_ADAPTIVE_RIDE_INTENT: AdaptiveRideIntent = {
   prompt: ADAPTIVE_RIDE_PRESETS[0].prompt,
   riderText: "",
 };
+
+const FIXED_TRACK_COACH_INTERVAL_OPTIONS = [1, 3, 5, 10, 15] as const;
+const DEFAULT_FIXED_TRACK_COACH_INTERVAL_MINUTES = 5;
+const ADAPTIVE_REWRITE_INTERVAL_OPTIONS = [null, 1, 2, 3, 5, 10, 15] as const;
+const DEFAULT_ADAPTIVE_REWRITE_INTERVAL_MINUTES = DEFAULT_ADAPTIVE_RIDE_INTENT.feedbackIntervalMinutes;
 
 function clampAdaptiveFeedbackInterval(minutes: number) {
   return Math.max(1, Math.min(15, Math.round(minutes)));
@@ -234,9 +241,6 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
   const [adaptiveDurationInput, setAdaptiveDurationInput] = useState(
     String(DEFAULT_ADAPTIVE_RIDE_INTENT.durationMinutes)
   );
-  const [adaptiveFeedbackIntervalInput, setAdaptiveFeedbackIntervalInput] = useState(
-    String(DEFAULT_ADAPTIVE_RIDE_INTENT.feedbackIntervalMinutes)
-  );
   const [isBuildingWorkout, setIsBuildingWorkout] = useState(false);
   const [unsavedBuiltWorkoutId, setUnsavedBuiltWorkoutId] = useState<string | null>(null);
   const [isSavingBuiltWorkout, setIsSavingBuiltWorkout] = useState(false);
@@ -247,6 +251,12 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
   const [liveCoachFeedback, setLiveCoachFeedback] = useState<string | null>(null);
   const [liveCoachDetail, setLiveCoachDetail] = useState<string | null>(null);
   const [liveCoachStatus, setLiveCoachStatus] = useState<"idle" | "checking" | "error">("idle");
+  const [fixedTrackCoachIntervalMinutes, setFixedTrackCoachIntervalMinutes] = useState(
+    DEFAULT_FIXED_TRACK_COACH_INTERVAL_MINUTES
+  );
+  const [adaptiveRewriteIntervalMinutes, setAdaptiveRewriteIntervalMinutes] = useState<number | null>(
+    DEFAULT_ADAPTIVE_REWRITE_INTERVAL_MINUTES
+  );
   const [isListeningForAdaptiveInstruction, setIsListeningForAdaptiveInstruction] = useState(false);
   const [adaptiveVoiceRecordingSeconds, setAdaptiveVoiceRecordingSeconds] = useState(0);
   const [upcomingChange, setUpcomingChange] = useState<{ nextTarget: number, currentTarget: number, seconds: number } | null>(null);
@@ -277,9 +287,11 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
   const isResistanceWorkoutMode = manualControlMode === "resistance" || activeTrainerMode.type === "resistance";
   const workoutPlanDuration = workout.blocks.reduce((acc, b) => acc + b.durationSeconds, 0);
   const adaptiveTargetDuration = Math.max(0, Math.round(adaptiveRideIntent.durationMinutes * 60));
-  const adaptiveFeedbackIntervalSeconds = clampAdaptiveFeedbackInterval(
-    adaptiveRideIntent.feedbackIntervalMinutes
-  ) * 60;
+  const adaptiveRewriteEnabled = adaptiveRewriteIntervalMinutes !== null;
+  const adaptiveFeedbackIntervalSeconds = adaptiveRewriteEnabled
+    ? clampAdaptiveFeedbackInterval(adaptiveRewriteIntervalMinutes) * 60
+    : null;
+  const fixedTrackCoachIntervalSeconds = fixedTrackCoachIntervalMinutes * 60;
   const totalDuration = adaptive ? adaptiveTargetDuration : workoutPlanDuration;
 
   useEffect(() => {
@@ -388,6 +400,8 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
     let acc = 0;
     let offsetSeconds = 0;
     let currentTargetPower: number | null = null;
+    let currentBlockDurationSeconds: number | null = null;
+    let currentBlockElapsedSeconds: number | null = null;
 
     for (const block of workout.blocks) {
       const blockStart = acc;
@@ -405,6 +419,8 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
       const isCurrent = elapsed >= blockStart && elapsed < blockEnd;
       if (isCurrent) {
         currentTargetPower = block.targetPower;
+        currentBlockDurationSeconds = block.durationSeconds;
+        currentBlockElapsedSeconds = elapsed - blockStart;
       }
 
       const previous = remainingBlocks[remainingBlocks.length - 1];
@@ -429,6 +445,8 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
       totalDurationSeconds,
       remainingSeconds: Math.max(0, totalDurationSeconds - elapsed),
       currentTargetPower,
+      currentBlockDurationSeconds,
+      currentBlockElapsedSeconds,
       remainingBlocks: remainingBlocks.slice(0, 30),
       truncated: remainingBlocks.length > 30,
     };
@@ -696,7 +714,6 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
   const openAdaptiveSetup = () => {
     setAdaptiveIntentDraft(adaptiveRideIntent);
     setAdaptiveDurationInput(String(adaptiveRideIntent.durationMinutes));
-    setAdaptiveFeedbackIntervalInput(String(adaptiveRideIntent.feedbackIntervalMinutes));
     setIsAdaptiveSetupOpen(true);
   };
 
@@ -713,7 +730,6 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
 
   const handleLoadAdaptiveRide = () => {
     const parsedDuration = Number(adaptiveDurationInput);
-    const parsedFeedbackInterval = Number(adaptiveFeedbackIntervalInput);
     const safeDuration = Math.max(
       10,
       Math.min(
@@ -726,9 +742,7 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
       )
     );
     const safeFeedbackInterval = clampAdaptiveFeedbackInterval(
-      Number.isFinite(parsedFeedbackInterval) && parsedFeedbackInterval > 0
-        ? parsedFeedbackInterval
-        : adaptiveIntentDraft.feedbackIntervalMinutes
+      adaptiveRewriteIntervalMinutes ?? adaptiveIntentDraft.feedbackIntervalMinutes
     );
     setAdaptiveRideIntent({
       ...adaptiveIntentDraft,
@@ -736,7 +750,6 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
       feedbackIntervalMinutes: safeFeedbackInterval,
     });
     setAdaptiveDurationInput(String(safeDuration));
-    setAdaptiveFeedbackIntervalInput(String(safeFeedbackInterval));
     setWorkout({
       ...ADAPTIVE_FREERIDE,
       blocks: [{ durationSeconds: safeDuration * 60, targetPower: ADAPTIVE_FREERIDE.blocks[0].targetPower }],
@@ -1021,6 +1034,12 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
               : current.riderText,
         };
       });
+      if (
+        typeof update.feedbackIntervalMinutes === "number" &&
+        Number.isFinite(update.feedbackIntervalMinutes)
+      ) {
+        setAdaptiveRewriteIntervalMinutes(clampAdaptiveFeedbackInterval(update.feedbackIntervalMinutes));
+      }
 
       if (Array.isArray(update.blocks) && update.blocks.length > 0) {
         const leadSeconds =
@@ -1201,8 +1220,28 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
     workout.name,
   ]);
 
+  const handleAdaptiveRewriteIntervalSelect = (minutes: number | null) => {
+    setAdaptiveRewriteIntervalMinutes(minutes);
+    if (minutes === null) {
+      rideGenerationRef.current += 1;
+      coachSpeechRequestRef.current += 1;
+      stopAdaptiveVoiceRecording();
+      liveCoachRunningRef.current = false;
+      lastAdaptivePlanSecondRef.current = elapsedSeconds;
+      setLiveCoachStatus("idle");
+      setLiveCoachDetail(null);
+      return;
+    }
+
+    const safeMinutes = clampAdaptiveFeedbackInterval(minutes);
+    setAdaptiveRideIntent((current) => ({
+      ...current,
+      feedbackIntervalMinutes: safeMinutes,
+    }));
+  };
+
   const startAdaptiveVoiceInstruction = useCallback(() => {
-    if (!adaptive) return;
+    if (!adaptive || !adaptiveRewriteEnabled) return;
 
     if (isListeningForAdaptiveInstruction) {
       adaptiveVoiceRecorderRef.current?.stop();
@@ -1292,7 +1331,13 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
         setLiveCoachDetail(err instanceof Error ? err.message : String(err));
       }
     })();
-  }, [adaptive, elapsedSeconds, isListeningForAdaptiveInstruction, requestLiveCoachCheck]);
+  }, [
+    adaptive,
+    adaptiveRewriteEnabled,
+    elapsedSeconds,
+    isListeningForAdaptiveInstruction,
+    requestLiveCoachCheck,
+  ]);
 
   useEffect(() => {
     if (!isPlaying) return;
@@ -1322,6 +1367,8 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
     ]);
 
     if (adaptive) {
+      if (!adaptiveRewriteEnabled || adaptiveFeedbackIntervalSeconds === null) return;
+
       const shouldRequestAdaptivePlan =
         elapsedSeconds >= 30 &&
         (elapsedSeconds === 30 ||
@@ -1335,8 +1382,8 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
     }
 
     if (
-      elapsedSeconds >= 5 * 60 &&
-      elapsedSeconds % (5 * 60) === 0 &&
+      elapsedSeconds >= fixedTrackCoachIntervalSeconds &&
+      elapsedSeconds - lastLiveCoachCheckSecondRef.current >= fixedTrackCoachIntervalSeconds &&
       lastLiveCoachCheckSecondRef.current !== elapsedSeconds
     ) {
       lastLiveCoachCheckSecondRef.current = elapsedSeconds;
@@ -1344,10 +1391,12 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
     }
   }, [
     adaptive,
+    adaptiveRewriteEnabled,
     adaptiveFeedbackIntervalSeconds,
     cadence,
     currentHrZone,
     elapsedSeconds,
+    fixedTrackCoachIntervalSeconds,
     getRemainingWorkoutSnapshot,
     heartRate,
     isPlaying,
@@ -1433,7 +1482,7 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
         })}
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="grid gap-3">
         <div className="grid gap-2">
           <label className="text-xs font-medium text-muted-foreground" htmlFor="adaptive-duration">
             Ride duration
@@ -1454,34 +1503,6 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
                 setAdaptiveIntentDraft((current) => ({
                   ...current,
                   durationMinutes: nextNumber,
-                }));
-              }}
-              className="h-9 w-24 rounded-md border border-input bg-transparent px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            />
-            <span className="text-sm text-muted-foreground">minutes</span>
-          </div>
-        </div>
-
-        <div className="grid gap-2">
-          <label className="text-xs font-medium text-muted-foreground" htmlFor="adaptive-feedback-interval">
-            Coach interval
-          </label>
-          <div className="flex items-center gap-2">
-            <input
-              id="adaptive-feedback-interval"
-              type="number"
-              min={1}
-              max={15}
-              step={1}
-              value={adaptiveFeedbackIntervalInput}
-              onChange={(event) => {
-                const nextValue = event.target.value;
-                setAdaptiveFeedbackIntervalInput(nextValue);
-                const nextNumber = Number(nextValue);
-                if (!Number.isFinite(nextNumber)) return;
-                setAdaptiveIntentDraft((current) => ({
-                  ...current,
-                  feedbackIntervalMinutes: nextNumber,
                 }));
               }}
               className="h-9 w-24 rounded-md border border-input bg-transparent px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
@@ -1857,6 +1878,70 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
             <p className="text-xs text-red-500 font-medium self-center mr-4">Connect trainer to play</p>
           ) : null}
 
+          {!adaptive && (
+            <div className="flex items-center gap-2 rounded-md border bg-background/60 px-2 py-1">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Coach
+              </span>
+              <div className="flex rounded-md bg-muted/60 p-0.5">
+                {FIXED_TRACK_COACH_INTERVAL_OPTIONS.map((minutes) => {
+                  const selected = fixedTrackCoachIntervalMinutes === minutes;
+                  return (
+                    <button
+                      key={minutes}
+                      type="button"
+                      onClick={() => setFixedTrackCoachIntervalMinutes(minutes)}
+                      className={`h-7 min-w-9 rounded px-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${
+                        selected
+                          ? "bg-background text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                      aria-pressed={selected}
+                      title={`Coach update every ${minutes} minute${minutes === 1 ? "" : "s"}`}
+                    >
+                      {minutes}m
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {adaptive && (
+            <div className="flex items-center gap-2 rounded-md border bg-background/60 px-2 py-1">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Rewrite
+              </span>
+              <div className="flex rounded-md bg-muted/60 p-0.5">
+                {ADAPTIVE_REWRITE_INTERVAL_OPTIONS.map((minutes) => {
+                  const selected = adaptiveRewriteIntervalMinutes === minutes;
+                  const label = minutes === null ? "Off" : `${minutes}m`;
+                  const title =
+                    minutes === null
+                      ? "Turn adaptive rewrites and coach speech off"
+                      : `Rewrite adaptive ride every ${minutes} minute${minutes === 1 ? "" : "s"}`;
+
+                  return (
+                    <button
+                      key={minutes ?? "off"}
+                      type="button"
+                      onClick={() => handleAdaptiveRewriteIntervalSelect(minutes)}
+                      className={`h-7 min-w-9 rounded px-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${
+                        selected
+                          ? "bg-background text-foreground shadow-sm"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                      aria-pressed={selected}
+                      title={title}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
 	          {elapsedSeconds > 0 && !isPlaying && (
 	            <Dialog open={isFinishOpen} onOpenChange={setIsFinishOpen}>
               <DialogTrigger asChild>
@@ -1913,10 +1998,22 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
               onClick={startAdaptiveVoiceInstruction}
               variant={isListeningForAdaptiveInstruction ? "secondary" : "outline"}
               size="icon"
-              disabled={disabled}
+              disabled={disabled || !adaptiveRewriteEnabled}
               className={isListeningForAdaptiveInstruction ? "border-red-500 text-red-600 ring-2 ring-red-500/30" : undefined}
-              title={isListeningForAdaptiveInstruction ? "Stop recording" : "Record adaptive ride instruction"}
-              aria-label={isListeningForAdaptiveInstruction ? "Stop recording" : "Record adaptive ride instruction"}
+              title={
+                !adaptiveRewriteEnabled
+                  ? "Adaptive rewrite is off"
+                  : isListeningForAdaptiveInstruction
+                    ? "Stop recording"
+                    : "Record adaptive ride instruction"
+              }
+              aria-label={
+                !adaptiveRewriteEnabled
+                  ? "Adaptive rewrite is off"
+                  : isListeningForAdaptiveInstruction
+                    ? "Stop recording"
+                    : "Record adaptive ride instruction"
+              }
             >
               <Mic className={isListeningForAdaptiveInstruction ? "animate-pulse" : undefined} />
             </Button>
