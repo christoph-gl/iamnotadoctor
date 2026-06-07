@@ -1,0 +1,19 @@
+{
+  "id": "ai-built-1779345771770",
+  "name": "Strict Zone 2 Recovery Ride",
+  "description": "A steady 30-minute session designed to keep you strictly within your Zone 2 aerobic power range. Given the heart rate drift observed in your recent session on May 19th, we are focusing on a controlled 61% of FTP to ensure the effort remains truly 'low effort' as requested.",
+  "blocks": [
+    {
+      "durationSeconds": 300,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 1200,
+      "targetPower": 105
+    },
+    {
+      "durationSeconds": 300,
+      "targetPower": 77
+    }
+  ]
+}

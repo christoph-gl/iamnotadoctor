@@ -1,0 +1,199 @@
+{
+  "id": "imported-zwo-1777531262065",
+  "name": "HIIT Anaerobic for Garmin",
+  "description": "45 second high power intervals with 1 minute recovery should deplete your W’\nThis is a hard session and you’ll need to be well recovered, before and after.\nThis workout will hit the Anaerobic capacity category for Garmin’s Primary benefit section of training effect. Not only, that, your aerobic system gets a good workout too.\nIf you want sprint work check out my HIIT anaerobic ski preparation workout.\n",
+  "blocks": [
+    {
+      "durationSeconds": 300,
+      "targetPower": 114
+    },
+    {
+      "durationSeconds": 300,
+      "targetPower": 139
+    },
+    {
+      "durationSeconds": 45,
+      "targetPower": 277
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 45,
+      "targetPower": 277
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 45,
+      "targetPower": 277
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 45,
+      "targetPower": 277
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 45,
+      "targetPower": 277
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 45,
+      "targetPower": 277
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 45,
+      "targetPower": 277
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 45,
+      "targetPower": 277
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 300,
+      "targetPower": 139
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 129
+    },
+    {
+      "durationSeconds": 45,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 129
+    },
+    {
+      "durationSeconds": 45,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 129
+    },
+    {
+      "durationSeconds": 45,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 129
+    },
+    {
+      "durationSeconds": 45,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 45,
+      "targetPower": 277
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 45,
+      "targetPower": 277
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 45,
+      "targetPower": 277
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 45,
+      "targetPower": 277
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 45,
+      "targetPower": 277
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 45,
+      "targetPower": 277
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 45,
+      "targetPower": 277
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 45,
+      "targetPower": 277
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 129
+    },
+    {
+      "durationSeconds": 45,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 129
+    },
+    {
+      "durationSeconds": 45,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 180,
+      "targetPower": 139
+    }
+  ]
+}

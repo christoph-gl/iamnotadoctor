@@ -1,0 +1,123 @@
+{
+  "id": "imported-zwo-1777531254443",
+  "name": "FTP ramp test",
+  "description": "Based on a popular FTP ramp test, but with a longer warming up and cooling down. Cycle till exhaustion, take the average of the last minute of effort and multiply it by 0.75, that's your FTP. You don't need to finish the ramp or each individual minute. Stop when you are exhausted.",
+  "blocks": [
+    {
+      "durationSeconds": 120,
+      "targetPower": 48
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 64
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 79
+    },
+    {
+      "durationSeconds": 180,
+      "targetPower": 89
+    },
+    {
+      "durationSeconds": 180,
+      "targetPower": 100
+    },
+    {
+      "durationSeconds": 300,
+      "targetPower": 79
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 89
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 100
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 110
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 120
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 131
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 141
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 151
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 162
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 172
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 182
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 193
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 203
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 213
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 224
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 234
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 244
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 255
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 265
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 275
+    },
+    {
+      "durationSeconds": 600,
+      "targetPower": 89
+    },
+    {
+      "durationSeconds": 180,
+      "targetPower": 79
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 64
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 48
+    }
+  ]
+}

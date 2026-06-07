@@ -1,0 +1,131 @@
+{
+  "id": "imported-zwo-1777531276471",
+  "name": "Power Builder 60",
+  "description": "3 sets of over/under intervals. 105% FTP for two minutes followed by one minute at 85% FTP. 4 minute warmup and cooldown.",
+  "blocks": [
+    {
+      "durationSeconds": 240,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 181
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 146
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 181
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 146
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 181
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 146
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 181
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 146
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 181
+    },
+    {
+      "durationSeconds": 300,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 181
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 146
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 181
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 146
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 181
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 146
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 181
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 146
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 181
+    },
+    {
+      "durationSeconds": 300,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 181
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 146
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 181
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 146
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 181
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 146
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 181
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 146
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 181
+    },
+    {
+      "durationSeconds": 240,
+      "targetPower": 86
+    }
+  ]
+}

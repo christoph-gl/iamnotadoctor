@@ -1,0 +1,91 @@
+{
+  "id": "imported-1779353116914",
+  "name": "Extracted Workout",
+  "description": "Imported via AI extraction",
+  "blocks": [
+    {
+      "durationSeconds": 300,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 120
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 146
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 172
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 103
+    },
+    {
+      "durationSeconds": 15,
+      "targetPower": 335
+    },
+    {
+      "durationSeconds": 15,
+      "targetPower": 821
+    },
+    {
+      "durationSeconds": 200,
+      "targetPower": 95
+    },
+    {
+      "durationSeconds": 15,
+      "targetPower": 821
+    },
+    {
+      "durationSeconds": 200,
+      "targetPower": 95
+    },
+    {
+      "durationSeconds": 15,
+      "targetPower": 821
+    },
+    {
+      "durationSeconds": 200,
+      "targetPower": 95
+    },
+    {
+      "durationSeconds": 15,
+      "targetPower": 821
+    },
+    {
+      "durationSeconds": 200,
+      "targetPower": 95
+    },
+    {
+      "durationSeconds": 15,
+      "targetPower": 821
+    },
+    {
+      "durationSeconds": 200,
+      "targetPower": 95
+    },
+    {
+      "durationSeconds": 15,
+      "targetPower": 821
+    },
+    {
+      "durationSeconds": 200,
+      "targetPower": 95
+    },
+    {
+      "durationSeconds": 15,
+      "targetPower": 821
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 95
+    },
+    {
+      "durationSeconds": 180,
+      "targetPower": 86
+    }
+  ]
+}

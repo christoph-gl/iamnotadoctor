@@ -1,0 +1,644 @@
+import {
+  generateObject,
+  type ModelMessage,
+  getOpenRouterModel,
+  openRouterApiKey,
+  openRouterDefaultModel,
+} from "@/lib/llm-calls-env";
+import { z } from "zod";
+import { NextResponse } from "next/server";
+import type { LiveCoachCommand } from "@/lib/live-coach-command";
+import { makeLiveCoachCommandId } from "@/lib/live-coach-command";
+
+export const dynamic = "force-dynamic";
+
+const liveCoachApiKey = process.env.LIVE_COACH_API_KEY || openRouterApiKey;
+
+const liveCoachModelName =
+  process.env.LIVE_COACH_MODEL || openRouterDefaultModel;
+
+const liveCoachModel = getOpenRouterModel(liveCoachModelName);
+
+const liveCoachTimeoutMs = Math.min(
+  30_000,
+  Math.max(1_000, Number(process.env.LIVE_COACH_TIMEOUT_MS || 8_000))
+);
+const adaptiveCoachTimeoutMs = Math.min(
+  30_000,
+  Math.max(liveCoachTimeoutMs, Number(process.env.ADAPTIVE_COACH_TIMEOUT_MS || 15_000))
+);
+const adaptiveVoiceCoachTimeoutMs = Math.min(
+  90_000,
+  Math.max(
+    adaptiveCoachTimeoutMs,
+    Number(process.env.ADAPTIVE_VOICE_COACH_TIMEOUT_MS || 45_000)
+  )
+);
+
+const RiderCueSchema = z
+  .string()
+  .min(1)
+  .describe("One rider-facing coaching comment. No lists, loops, or repeated encouragement.");
+
+const ActionReasonSchema = z
+  .string()
+  .max(120)
+  .optional()
+  .describe("Brief internal reason for the chosen action.");
+
+const LiveCoachActionSchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("none"),
+    reason: ActionReasonSchema.describe("Brief internal reason for taking no action."),
+  }),
+  z.object({
+    action: z.literal("send_message"),
+    text: RiderCueSchema.describe("Short rider-facing cue to display when action is send_message."),
+    reason: ActionReasonSchema,
+    speak: z.boolean().optional(),
+  }),
+  z.object({
+    action: z.literal("set_erg_watts"),
+    watts: z
+      .number()
+      .describe("ERG target watts to apply immediately when action is set_erg_watts."),
+    text: RiderCueSchema.optional().describe("Short rider-facing explanation to display when this changes trainer load."),
+    reason: ActionReasonSchema,
+  }),
+  z.object({
+    action: z.literal("set_resistance"),
+    percent: z
+      .number()
+      .describe("Resistance percent from 0 to 100 when action is set_resistance."),
+    text: RiderCueSchema.optional().describe("Short rider-facing explanation to display when this changes trainer load."),
+    reason: ActionReasonSchema,
+  }),
+  z.object({
+    action: z.literal("set_workout_plan"),
+    leadSeconds: z
+      .number()
+      .optional()
+      .describe("Delay before a workout-plan splice takes effect."),
+    blocks: z
+      .array(
+        z.object({
+          durationSeconds: z.number(),
+          targetPower: z.number(),
+        })
+      )
+      .min(1)
+      .describe("Upcoming workout blocks that replace the current remaining workout plan."),
+    text: RiderCueSchema.optional().describe("Short rider-facing explanation to display when this changes the adaptive plan."),
+    reason: ActionReasonSchema,
+  }),
+  z.object({
+    action: z.literal("update_adaptive_ride"),
+    label: z.string().max(80).optional(),
+    durationMinutes: z.number().optional(),
+    feedbackIntervalMinutes: z.number().optional(),
+    prompt: z
+      .string()
+      .max(500)
+      .optional()
+      .describe("Updated adaptive ride goal for future coach checks."),
+    riderText: z
+      .string()
+      .max(500)
+      .optional()
+      .describe("Compact summary of the rider's latest adaptive instruction."),
+    blocks: z
+      .array(
+        z.object({
+          durationSeconds: z.number(),
+          targetPower: z.number(),
+        })
+      )
+      .optional()
+      .describe("Optional immediate plan blocks to apply after updating the adaptive goal."),
+    text: RiderCueSchema.optional().describe("Short rider-facing confirmation."),
+    reason: ActionReasonSchema,
+  }),
+]);
+
+const WorkoutPlanEditSchema = z.object({
+  leadSeconds: z
+    .number()
+    .optional()
+    .describe("Delay before the workout-plan splice takes effect."),
+  blocks: z
+    .array(
+      z.object({
+        durationSeconds: z.number(),
+        targetPower: z.number(),
+      })
+    )
+    .describe("Upcoming workout blocks that replace the current remaining workout plan."),
+  reason: ActionReasonSchema.describe("Brief internal reason for the workout edit."),
+});
+
+function clampNumber(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, Math.round(value)));
+}
+
+function toCommand(action: z.infer<typeof LiveCoachActionSchema>): LiveCoachCommand | null {
+  const reason = action.reason?.trim() || "Live coach check";
+
+  if (action.action === "send_message") {
+    const text = action.text?.trim();
+    if (!text) return null;
+    return {
+      id: makeLiveCoachCommandId(),
+      type: "send_message",
+      text: text.slice(0, 180),
+      speak: action.speak,
+      reason,
+    };
+  }
+
+  if (action.action === "set_erg_watts" && typeof action.watts === "number") {
+    return {
+      id: makeLiveCoachCommandId(),
+      type: "set_erg_watts",
+      watts: clampNumber(action.watts, 50, 500),
+      reason,
+    };
+  }
+
+  if (action.action === "set_resistance" && typeof action.percent === "number") {
+    return {
+      id: makeLiveCoachCommandId(),
+      type: "set_resistance",
+      percent: clampNumber(action.percent, 0, 100),
+      reason,
+    };
+  }
+
+  if (action.action === "set_workout_plan" && action.blocks?.length) {
+    const blocks = action.blocks.slice(0, 30).map((block) => ({
+      durationSeconds: clampNumber(block.durationSeconds, 30, 600),
+      targetPower: clampNumber(block.targetPower, 50, 500),
+    }));
+
+    return {
+      id: makeLiveCoachCommandId(),
+      type: "set_workout_plan",
+      horizonSeconds: Math.min(
+        30 * 60,
+        Math.max(
+          60,
+          blocks.reduce((total, block) => total + block.durationSeconds, 0)
+        )
+      ),
+      leadSeconds: clampNumber(action.leadSeconds ?? 5, 0, 60),
+      blocks,
+      reason,
+    };
+  }
+
+  if (action.action === "update_adaptive_ride") {
+    return null;
+  }
+
+  return null;
+}
+
+function getRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+}
+
+function isTimeoutError(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; depth < 4; depth += 1) {
+    const record = getRecord(current);
+    const message =
+      current instanceof Error
+        ? current.message
+        : typeof record?.message === "string"
+          ? record.message
+          : "";
+    const name =
+      current instanceof Error
+        ? current.name
+        : typeof record?.name === "string"
+          ? record.name
+          : "";
+
+    if (
+      name === "TimeoutError" ||
+      name === "AbortError" ||
+      (typeof record?.code === "string" && record.code === "ABORT_ERR") ||
+      (typeof record?.code === "number" && record.code === 20) ||
+      message.toLowerCase().includes("timeout") ||
+      message.toLowerCase().includes("aborted") ||
+      message.toLowerCase().includes("aborted due to timeout")
+    ) {
+      return true;
+    }
+
+    current = record?.cause;
+    if (!current) return false;
+  }
+
+  return false;
+}
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function sanitizeRiderCue(value: unknown) {
+  if (typeof value !== "string") return undefined;
+
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (!normalized) return undefined;
+
+  return normalized.slice(0, 420).trim();
+}
+
+function sanitizeLiveCoachAction(action: z.infer<typeof LiveCoachActionSchema>) {
+  if ("text" in action) {
+    const text = sanitizeRiderCue(action.text);
+    if (text) return { ...action, text };
+  }
+
+  return action;
+}
+
+function planEditToAction(plan: z.infer<typeof WorkoutPlanEditSchema>) {
+  return {
+    action: "set_workout_plan" as const,
+    leadSeconds: plan.leadSeconds ?? 0,
+    blocks: plan.blocks,
+    reason: plan.reason || "Workout plan edited by live coach.",
+  };
+}
+
+function compactNumber(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? Math.round(value) : null;
+}
+
+function compactString(value: unknown, maxLength = 220) {
+  return typeof value === "string" ? value.slice(0, maxLength) : null;
+}
+
+function compactConversationHistory(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .slice(-6)
+    .map((turn) => {
+      const record = getRecord(turn);
+      if (!record) return null;
+      const role = record.role === "assistant" ? "assistant" : "user";
+      return {
+        role,
+        text: compactString(record.text, 180),
+        command: compactString(record.command, 80),
+        execution:
+          record.execution === "applied" ||
+          record.execution === "failed" ||
+          record.execution === "none"
+            ? record.execution
+            : undefined,
+      };
+    })
+    .filter(Boolean);
+}
+
+function compactWorkout(value: unknown) {
+  const workout = getRecord(value);
+  if (!workout) return null;
+  const blocks = Array.isArray(workout.remainingBlocks)
+    ? workout.remainingBlocks
+        .slice(0, 30)
+        .map((block) => {
+          const record = getRecord(block);
+          if (!record) return null;
+          return {
+            offsetSeconds: compactNumber(record.offsetSeconds),
+            durationSeconds: compactNumber(record.durationSeconds),
+            targetPower: compactNumber(record.targetPower),
+            isCurrent: Boolean(record.isCurrent),
+          };
+        })
+        .filter(Boolean)
+    : [];
+
+  return {
+    workoutName: compactString(workout.workoutName, 120),
+    isPlaying: Boolean(workout.isPlaying),
+    elapsedSeconds: compactNumber(workout.elapsedSeconds),
+    remainingSeconds: compactNumber(workout.remainingSeconds),
+    currentTargetPower: compactNumber(workout.currentTargetPower),
+    remainingBlocks: blocks,
+    truncated: Boolean(workout.truncated),
+  };
+}
+
+function compactSnapshot(value: unknown) {
+  const snapshot = getRecord(value);
+  if (!snapshot) return null;
+  const latestSample = getRecord(snapshot.latestSample);
+  const riderProfile = getRecord(snapshot.riderProfile);
+  const fourDP = getRecord(riderProfile?.fourDP);
+  const rolling = getRecord(snapshot.rolling);
+  const adaptiveRideIntent = getRecord(snapshot.adaptiveRideIntent);
+  const rollingSnapshots = Array.isArray(rolling?.snapshots)
+    ? rolling.snapshots
+        .slice(-20)
+        .map((item) => {
+          const record = getRecord(item);
+          if (!record) return null;
+          return {
+            offsetSeconds: compactNumber(record.offsetSeconds),
+            durationSeconds: compactNumber(record.durationSeconds),
+            avgPowerW: compactNumber(record.avgPowerW),
+            avgCadenceRpm: compactNumber(record.avgCadenceRpm),
+            avgHeartRateBpm: compactNumber(record.avgHeartRateBpm),
+            targetPower: compactNumber(record.targetPower),
+            hrZone: compactString(record.hrZone, 80),
+          };
+        })
+        .filter(Boolean)
+    : [];
+  const rideSoFar = getRecord(rolling?.rideSoFar);
+
+  return {
+    generatedAtIso: compactString(snapshot.generatedAtIso, 40),
+    connectionState: compactString(snapshot.connectionState, 40),
+    hrConnectionState: compactString(snapshot.hrConnectionState, 40),
+    activeTrainerMode: snapshot.activeTrainerMode ?? null,
+    adaptivePlanHorizonSeconds: compactNumber(snapshot.adaptivePlanHorizonSeconds),
+    adaptiveRideIntent: adaptiveRideIntent
+      ? {
+          presetId: compactString(adaptiveRideIntent.presetId, 40),
+          label: compactString(adaptiveRideIntent.label, 80),
+          durationMinutes: compactNumber(adaptiveRideIntent.durationMinutes),
+          feedbackIntervalMinutes: compactNumber(adaptiveRideIntent.feedbackIntervalMinutes),
+          prompt: compactString(adaptiveRideIntent.prompt, 500),
+          riderText: compactString(adaptiveRideIntent.riderText, 500),
+        }
+      : null,
+    workoutName: compactString(snapshot.workoutName, 120),
+    latestSample: latestSample
+      ? {
+          powerW: compactNumber(latestSample.powerW),
+          cadenceRpm: compactNumber(latestSample.cadenceRpm),
+          heartRateBpm: compactNumber(latestSample.heartRateBpm),
+        }
+      : null,
+    rolling: rolling
+      ? {
+          sampleWindowSeconds: compactNumber(rolling.sampleWindowSeconds),
+          rideSoFar: rideSoFar
+            ? {
+                elapsedSeconds: compactNumber(rideSoFar.elapsedSeconds),
+                avgPowerW: compactNumber(rideSoFar.avgPowerW),
+                avgCadenceRpm: compactNumber(rideSoFar.avgCadenceRpm),
+                avgHeartRateBpm: compactNumber(rideSoFar.avgHeartRateBpm),
+              }
+            : null,
+          snapshots: rollingSnapshots,
+        }
+      : null,
+    currentHrZone: snapshot.currentHrZone ?? null,
+    riderProfile: riderProfile
+      ? {
+          ftp: compactNumber(fourDP?.ftp ?? riderProfile.ftp),
+          map: compactNumber(fourDP?.map ?? riderProfile.map),
+          ac: compactNumber(fourDP?.ac ?? riderProfile.ac),
+          nm: compactNumber(fourDP?.nm ?? riderProfile.nm),
+          cTHR: compactNumber(riderProfile.cTHR),
+          age: compactNumber(riderProfile.age),
+          weightKg: compactNumber(riderProfile.weightKg),
+          gender: compactString(riderProfile.gender, 40),
+          hrZones: Array.isArray(riderProfile.hrZones)
+            ? riderProfile.hrZones
+                .map((zone) => {
+                  const record = getRecord(zone);
+                  if (!record) return null;
+                  return {
+                    id: compactString(record.id, 20),
+                    name: compactString(record.name, 80),
+                    percentageRange: compactString(record.percentageRange, 40),
+                    minBpm: compactNumber(record.minBpm),
+                    maxBpm: compactNumber(record.maxBpm),
+                  };
+                })
+                .filter(Boolean)
+            : [],
+          memorySummary: compactString(riderProfile.memorySummary, 260),
+        }
+      : null,
+    lastAgentEntry: snapshot.lastAgentEntry ?? null,
+    remainingWorkout: compactWorkout(snapshot.remainingWorkout),
+  };
+}
+
+function isLikelyWorkoutPlanEdit(riderText: string, snapshot: ReturnType<typeof compactSnapshot>) {
+  if (!riderText.trim() || !snapshot?.remainingWorkout?.remainingBlocks.length) return false;
+  const text = riderText.toLowerCase();
+  const hasPlanScope =
+    /\b(workout|ride|plan|track|remaining|rest|whole|all|next|more|again)\b/.test(text);
+  const hasPlanVerb =
+    /\b(reduce|decrease|lower|drop|cut|increase|raise|add|harder|easier|compress|shorten|extend|stretch|intensity|effort|power|watts?)\b/.test(
+      text
+    );
+  return hasPlanScope && hasPlanVerb;
+}
+
+export async function POST(request: Request) {
+  const startedAt = Date.now();
+  const body = (await request.json()) as Record<string, unknown>;
+
+  const snapshot = body?.snapshot ?? null;
+  const intent =
+    body?.intent === "adaptive_plan" ||
+    body?.intent === "adaptive_instruction" ||
+    body?.intent === "periodic_ride_check" ||
+    body?.intent === "ride_start_summary"
+      ? body.intent
+      : "coach_check";
+  const riderText = typeof body?.riderText === "string" ? body.riderText : "";
+  const audioBase64 =
+    typeof body?.audioBase64 === "string" && body.audioBase64.length <= 8_000_000
+      ? body.audioBase64
+      : "";
+  const audioFormat =
+    typeof body?.audioFormat === "string" ? body.audioFormat.toLowerCase() : "";
+  const conversationHistory = compactConversationHistory(body?.conversationHistory);
+  const compactedSnapshot = compactSnapshot(snapshot);
+
+  if (!liveCoachApiKey) {
+    return NextResponse.json(
+      {
+        error:
+          "No live coach API key configured. Set LIVE_COACH_API_KEY, OPENROUTER_API_KEY, or LLM_CALLS_API_KEY.",
+      },
+      { status: 503 }
+    );
+  }
+
+  try {
+    if (isLikelyWorkoutPlanEdit(riderText, compactedSnapshot)) {
+      const result = await generateObject({
+        model: liveCoachModel,
+        apiKey: liveCoachApiKey,
+        abortSignal: AbortSignal.timeout(liveCoachTimeoutMs),
+        maxRetries: 1,
+        temperature: 0.2,
+        maxOutputTokens: 1_800,
+        schema: WorkoutPlanEditSchema,
+        system: `You edit the remaining workout track for a smart trainer web app.
+Return only the replacement remaining workout blocks.
+Use the current remainingWorkout.remainingBlocks as the source plan.
+Preserve block order unless the rider asks to compress, shorten, extend, or otherwise reshape duration.
+For "reduce/decrease/lower/cut intensity/effort/power 10%" multiply each current remaining targetPower by 0.9 and keep durations.
+For "reduce/decrease/lower/cut 10% more" apply another 0.9 multiplier to the current remaining blocks you receive now.
+For "increase/raise/add/harder 10%" multiply by 1.1 and keep durations.
+"More", "again", and "another" refer to the previous rider request in conversationHistory, but the math must be applied to the current remaining blocks.
+For compression to N minutes, scale durations to N*60 seconds while preserving relative proportions; keep each block at least 30 seconds.
+Use leadSeconds 0 for rider-requested edits.
+At most 30 blocks. At most 30 minutes total. Keep whole watts.`,
+        prompt: JSON.stringify({
+          riderText,
+          conversationHistory,
+          remainingWorkout: compactedSnapshot?.remainingWorkout,
+        }),
+      });
+
+      const action = planEditToAction(result.object);
+      const command = toCommand(action);
+
+      return NextResponse.json({
+        model: liveCoachModelName,
+        mode: "workout_plan_edit",
+        durationMs: Date.now() - startedAt,
+        action,
+        command,
+      });
+    }
+
+    const adaptiveInstructionContent: ModelMessage["content"] = [
+      {
+        type: "text",
+        text: JSON.stringify({
+          intent,
+          executionContract: {
+            returnedActionWillBeAppliedByBrowser: true,
+            sendMessageDoesNotChangeTrainerLoad: true,
+            setErgWattsChangesTrainerLoad: true,
+            setResistanceChangesTrainerLoad: true,
+            setWorkoutPlanChangesUpcomingWorkoutTargets: true,
+          },
+          conversationHistory,
+          riderText: riderText || null,
+          audioInstruction:
+            intent === "adaptive_instruction" && audioBase64
+              ? "Listen to the attached audio instruction and use it as the rider's latest request."
+              : null,
+          snapshot: compactedSnapshot,
+        }),
+      },
+    ];
+
+    if (intent === "adaptive_instruction" && audioBase64 && audioFormat) {
+      adaptiveInstructionContent.push({
+        type: "input_audio",
+        input_audio: {
+          data: audioBase64,
+          format: audioFormat,
+        },
+      });
+    }
+
+    const userContent: ModelMessage[] = [
+      {
+        role: "user",
+        content: adaptiveInstructionContent,
+      },
+    ];
+
+    const result = await generateObject({
+      model: liveCoachModel,
+      apiKey: liveCoachApiKey,
+      abortSignal: AbortSignal.timeout(
+        intent === "adaptive_instruction"
+          ? adaptiveVoiceCoachTimeoutMs
+          : intent === "adaptive_plan"
+            ? adaptiveCoachTimeoutMs
+            : liveCoachTimeoutMs
+      ),
+      maxRetries: 1,
+      temperature: intent === "periodic_ride_check" ? 0.55 : 0.2,
+      maxOutputTokens: intent === "adaptive_plan" || intent === "adaptive_instruction" ? 1_800 : 800,
+      schema: LiveCoachActionSchema,
+      system: `You are the low-latency live ride coach inside a smart trainer web app.
+Return one structured action only. This structured action is executed by the browser as the trainer-control tool call.
+Available executable actions:
+- set_erg_watts: immediately changes ERG target watts.
+- set_resistance: immediately changes trainer resistance percent.
+- set_workout_plan: replaces the upcoming workout track after leadSeconds.
+- send_message: rider-facing text only; it does not change trainer load.
+When action is send_message, include a non-empty text field with the exact rider-facing words to display.
+Do not use send_message when the rider clearly asks to change watts or resistance and the snapshot says the trainer is connected.
+For coach_check without a specific rider request, prefer one compact rider-facing comment unless telemetry clearly calls for ERG or resistance adjustment.
+For ride_start_summary during a preplanned workout, return send_message only. Give a coach-like opening in 2 to 3 short sentences: name the workout, summarize the course profile or target-power pattern, say what adaptation or training purpose it serves, and give one thing to watch for early. Do not merely welcome the rider. Do not return set_workout_plan, set_erg_watts, or set_resistance for ride_start_summary.
+For periodic_ride_check during a preplanned workout, return send_message only. Use the rider profile, heart-rate zones, 30-second rolling snapshots, ride-so-far averages, and remainingWorkout to give one coach-like comment about how the ride is going and what to focus on next. Rotate the focus across power versus target, cadence, heart-rate trend, workout progress, the next block, breathing, posture, fueling, and pacing. Do not repeat the topic or phrasing from conversationHistory; especially avoid another "heart rate stable in Zone 2" style line unless HR has clearly changed or matters most right now. Do not return set_workout_plan, set_erg_watts, or set_resistance for periodic_ride_check.
+When rider text is included, treat it as the latest chat message from the rider.
+Use set_workout_plan for requests that mention the workout, track, plan, remaining work, rest of workout, next N minutes, compressing duration, stretching duration, or scaling effort over time.
+snapshot.remainingWorkout.remainingBlocks is the source of truth for the remaining track. It starts at the rider's current point with offsetSeconds 0 and includes durationSeconds and targetPower for each block.
+For "decrease effort 10% for the rest of the workout", preserve the remaining block durations and return each targetPower multiplied by 0.9, rounded to whole watts.
+For "increase effort 10% for the rest of the workout", preserve durations and multiply each targetPower by 1.1.
+For "compress the rest of the workout to 10 minutes", preserve block order and relative duration proportions, scale total duration to 600 seconds, keep every returned block at least 30 seconds, and merge or omit tiny adjacent blocks if needed.
+For "make the next 10 minutes easier/harder", return blocks covering about 600 seconds and preserve the rest only when it fits within the 30 block and 30 minute command limit.
+set_workout_plan accepts at most 30 blocks and at most 30 minutes total. If the rider asks to rewrite more than that, apply the best next 30 minutes and explain the scope briefly in reason.
+Use leadSeconds 0 to 5 for rider-requested changes so the UI reflects the new plan immediately or near-immediately.
+If intent is adaptive_plan, use snapshot.adaptiveRideIntent as the ride goal. Return set_workout_plan with 5 to 10 blocks covering roughly the requested horizonSeconds. The plan should usually change target watts when telemetry supports a change, not merely describe one. Respect requested duration, heart-rate goals, hard/easy intent, and rider notes over generic workout structure. Include exactly one rider-facing text field that says what changed or held steady, why, and a brief note on the ride so far when telemetry is available. If the plan is effectively unchanged, say that it is holding steady and why. Do not include multiple encouragement phrases, alternatives, slogans, lists, or repeated praise. Keep reason under 120 characters.
+If intent is adaptive_instruction, treat riderText as the rider's spoken instruction for this adaptive freeride. Return update_adaptive_ride. Update durationMinutes when the rider changes length, feedbackIntervalMinutes when they change coach interval, and prompt/riderText when they change intensity, profile, heart-rate goals, constraints, or ride style. Include 5 to 10 immediate blocks when the instruction should change the current plan now. Make text a single useful confirmation of what changed.
+Keep rider-facing text natural and finite: no bullet lists, no duplicated clauses, no looping phrases, no mantra-style repetition, and no more than 3 short sentences unless the rider explicitly asks for detail.
+Never mention implementation details, APIs, agents, hooks, or JSON to the rider.
+If the rider reports pain, dizziness, chest pain, or wants to stop, lower intensity or stop escalating and send a safety-first cue.`,
+      messages: userContent,
+    });
+
+    const action = sanitizeLiveCoachAction(result.object);
+    const command = toCommand(action);
+
+    return NextResponse.json({
+      model: liveCoachModelName,
+      mode: "live_coach",
+      durationMs: Date.now() - startedAt,
+      action,
+      command,
+    });
+  } catch (error) {
+    const message = getErrorMessage(error);
+
+    if (isTimeoutError(error)) {
+      console.warn(
+        `[live-coach] Timed out after ${Date.now() - startedAt}ms; no command applied.`
+      );
+      return NextResponse.json({
+        model: liveCoachModelName,
+        degraded: true,
+        durationMs: Date.now() - startedAt,
+        error: "Live coach timed out.",
+        action: { action: "none", reason: "Live coach timed out; no local command fallback." },
+        command: null,
+      });
+    }
+
+    console.error("[live-coach] Failed to generate live coach action:", error);
+    return NextResponse.json(
+      {
+        model: liveCoachModelName,
+        degraded: true,
+        durationMs: Date.now() - startedAt,
+        error: message,
+        action: { action: "none", reason: "Live coach failed; no local command fallback." },
+        command: null,
+      },
+      { status: 200 }
+    );
+  }
+}

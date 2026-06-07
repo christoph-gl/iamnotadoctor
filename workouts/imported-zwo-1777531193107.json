@@ -1,0 +1,87 @@
+{
+  "id": "imported-zwo-1777531193107",
+  "name": "Aerobic Threshold 1 hour",
+  "description": "Targetting the first lactate threshold, the point before lactate increases above resting levels. Typically 75% of MHR, 85% of FTP.",
+  "blocks": [
+    {
+      "durationSeconds": 60,
+      "targetPower": 69
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 103
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 120
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 138
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 155
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 172
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 103
+    },
+    {
+      "durationSeconds": 360,
+      "targetPower": 146
+    },
+    {
+      "durationSeconds": 300,
+      "targetPower": 141
+    },
+    {
+      "durationSeconds": 360,
+      "targetPower": 146
+    },
+    {
+      "durationSeconds": 300,
+      "targetPower": 141
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 69
+    },
+    {
+      "durationSeconds": 420,
+      "targetPower": 146
+    },
+    {
+      "durationSeconds": 300,
+      "targetPower": 141
+    },
+    {
+      "durationSeconds": 420,
+      "targetPower": 146
+    },
+    {
+      "durationSeconds": 300,
+      "targetPower": 141
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 103
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 69
+    }
+  ]
+}

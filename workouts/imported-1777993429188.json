@@ -1,0 +1,203 @@
+{
+  "id": "imported-1777993429188",
+  "name": "Micro Intervals Reverse Pyramid",
+  "description": "Imported via AI extraction; adapted to cap screenshot-derived sprint spikes.",
+  "blocks": [
+    {
+      "durationSeconds": 90,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 90,
+      "targetPower": 112
+    },
+    {
+      "durationSeconds": 90,
+      "targetPower": 138
+    },
+    {
+      "durationSeconds": 30,
+      "targetPower": 163
+    },
+    {
+      "durationSeconds": 20,
+      "targetPower": 258
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 20,
+      "targetPower": 240
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 10,
+      "targetPower": 292
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 10,
+      "targetPower": 284
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 30,
+      "targetPower": 258
+    },
+    {
+      "durationSeconds": 30,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 30,
+      "targetPower": 249
+    },
+    {
+      "durationSeconds": 30,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 30,
+      "targetPower": 227
+    },
+    {
+      "durationSeconds": 30,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 30,
+      "targetPower": 216
+    },
+    {
+      "durationSeconds": 30,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 30,
+      "targetPower": 205
+    },
+    {
+      "durationSeconds": 30,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 30,
+      "targetPower": 194
+    },
+    {
+      "durationSeconds": 30,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 30,
+      "targetPower": 184
+    },
+    {
+      "durationSeconds": 30,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 155
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 138
+    },
+    {
+      "durationSeconds": 30,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 155
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 138
+    },
+    {
+      "durationSeconds": 30,
+      "targetPower": 184
+    },
+    {
+      "durationSeconds": 30,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 30,
+      "targetPower": 194
+    },
+    {
+      "durationSeconds": 30,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 30,
+      "targetPower": 205
+    },
+    {
+      "durationSeconds": 30,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 30,
+      "targetPower": 216
+    },
+    {
+      "durationSeconds": 30,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 30,
+      "targetPower": 227
+    },
+    {
+      "durationSeconds": 30,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 30,
+      "targetPower": 249
+    },
+    {
+      "durationSeconds": 30,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 30,
+      "targetPower": 258
+    },
+    {
+      "durationSeconds": 30,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 15,
+      "targetPower": 301
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 15,
+      "targetPower": 310
+    },
+    {
+      "durationSeconds": 305,
+      "targetPower": 86
+    }
+  ]
+}

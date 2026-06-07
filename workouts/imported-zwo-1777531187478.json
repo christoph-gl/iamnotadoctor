@@ -1,0 +1,171 @@
+{
+  "id": "imported-zwo-1777531187478",
+  "name": "90 minute Endurance 6578% Ftp",
+  "description": "Endurance 65-78% Ftp",
+  "blocks": [
+    {
+      "durationSeconds": 180,
+      "targetPower": 84
+    },
+    {
+      "durationSeconds": 180,
+      "targetPower": 95
+    },
+    {
+      "durationSeconds": 30,
+      "targetPower": 112
+    },
+    {
+      "durationSeconds": 30,
+      "targetPower": 129
+    },
+    {
+      "durationSeconds": 30,
+      "targetPower": 112
+    },
+    {
+      "durationSeconds": 30,
+      "targetPower": 129
+    },
+    {
+      "durationSeconds": 240,
+      "targetPower": 103
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 112
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 129
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 112
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 129
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 112
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 129
+    },
+    {
+      "durationSeconds": 240,
+      "targetPower": 103
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 112
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 129
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 112
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 129
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 112
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 129
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 103
+    },
+    {
+      "durationSeconds": 180,
+      "targetPower": 112
+    },
+    {
+      "durationSeconds": 240,
+      "targetPower": 129
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 112
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 129
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 112
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 129
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 103
+    },
+    {
+      "durationSeconds": 180,
+      "targetPower": 112
+    },
+    {
+      "durationSeconds": 240,
+      "targetPower": 129
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 112
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 129
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 112
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 129
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 103
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 112
+    },
+    {
+      "durationSeconds": 240,
+      "targetPower": 129
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 112
+    },
+    {
+      "durationSeconds": 180,
+      "targetPower": 129
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 112
+    },
+    {
+      "durationSeconds": 120,
+      "targetPower": 129
+    }
+  ]
+}

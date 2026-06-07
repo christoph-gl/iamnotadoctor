@@ -1,0 +1,111 @@
+{
+  "id": "imported-zwo-1777531290852",
+  "name": "VO2 Max 8x4min120%",
+  "description": "Warm Up, 8x4min at 120% of FTP, 4 minute rest periods, Cool Down.",
+  "blocks": [
+    {
+      "durationSeconds": 60,
+      "targetPower": 69
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 103
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 120
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 138
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 155
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 172
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 69
+    },
+    {
+      "durationSeconds": 30,
+      "targetPower": 206
+    },
+    {
+      "durationSeconds": 150,
+      "targetPower": 103
+    },
+    {
+      "durationSeconds": 240,
+      "targetPower": 206
+    },
+    {
+      "durationSeconds": 240,
+      "targetPower": 69
+    },
+    {
+      "durationSeconds": 240,
+      "targetPower": 206
+    },
+    {
+      "durationSeconds": 240,
+      "targetPower": 69
+    },
+    {
+      "durationSeconds": 240,
+      "targetPower": 206
+    },
+    {
+      "durationSeconds": 240,
+      "targetPower": 69
+    },
+    {
+      "durationSeconds": 240,
+      "targetPower": 206
+    },
+    {
+      "durationSeconds": 240,
+      "targetPower": 69
+    },
+    {
+      "durationSeconds": 240,
+      "targetPower": 206
+    },
+    {
+      "durationSeconds": 240,
+      "targetPower": 69
+    },
+    {
+      "durationSeconds": 240,
+      "targetPower": 206
+    },
+    {
+      "durationSeconds": 240,
+      "targetPower": 69
+    },
+    {
+      "durationSeconds": 240,
+      "targetPower": 206
+    },
+    {
+      "durationSeconds": 240,
+      "targetPower": 69
+    },
+    {
+      "durationSeconds": 240,
+      "targetPower": 206
+    },
+    {
+      "durationSeconds": 240,
+      "targetPower": 69
+    }
+  ]
+}

@@ -1,0 +1,87 @@
+{
+  "id": "imported-zwo-1777531284476",
+  "name": "Threshold Pulls 1 5x8min105%",
+  "description": "Warm Up, 5x8min at 105% of FTP, 4 minute rest periods, Cool Down.",
+  "blocks": [
+    {
+      "durationSeconds": 60,
+      "targetPower": 69
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 86
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 103
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 120
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 138
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 155
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 172
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 69
+    },
+    {
+      "durationSeconds": 30,
+      "targetPower": 189
+    },
+    {
+      "durationSeconds": 150,
+      "targetPower": 103
+    },
+    {
+      "durationSeconds": 480,
+      "targetPower": 181
+    },
+    {
+      "durationSeconds": 240,
+      "targetPower": 69
+    },
+    {
+      "durationSeconds": 480,
+      "targetPower": 181
+    },
+    {
+      "durationSeconds": 240,
+      "targetPower": 69
+    },
+    {
+      "durationSeconds": 480,
+      "targetPower": 181
+    },
+    {
+      "durationSeconds": 240,
+      "targetPower": 69
+    },
+    {
+      "durationSeconds": 480,
+      "targetPower": 181
+    },
+    {
+      "durationSeconds": 240,
+      "targetPower": 69
+    },
+    {
+      "durationSeconds": 480,
+      "targetPower": 181
+    },
+    {
+      "durationSeconds": 240,
+      "targetPower": 69
+    }
+  ]
+}

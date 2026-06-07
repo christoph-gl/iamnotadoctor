@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "skills": {
+    "ai-gateway": {
+      "source": "vercel/vercel-plugin",
+      "sourceType": "github",
+      "computedHash": "7e29de30c6a55cbd343ee4aabfa7b909a0b2daf1a0ca9a9e437ec8928d4cc801"
+    },
+    "openrouter-typescript-sdk": {
+      "source": "openrouterteam/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/typescript-sdk/SKILL.md",
+      "computedHash": "0cb0e2f07f6b42fb8974c2ee89ca3ba3a103dfe565f12bc7ca9f41945fc7227a"
+    }
+  }
+}

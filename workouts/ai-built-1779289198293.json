@@ -1,0 +1,35 @@
+{
+  "id": "ai-built-1779289198293",
+  "name": "Controlled Threshold Touch",
+  "description": "A 22-minute aerobic session including two short 1-minute threshold intervals to prime the legs without excessive fatigue.",
+  "blocks": [
+    {
+      "durationSeconds": 300,
+      "targetPower": 95
+    },
+    {
+      "durationSeconds": 300,
+      "targetPower": 115
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 172
+    },
+    {
+      "durationSeconds": 180,
+      "targetPower": 103
+    },
+    {
+      "durationSeconds": 60,
+      "targetPower": 172
+    },
+    {
+      "durationSeconds": 240,
+      "targetPower": 115
+    },
+    {
+      "durationSeconds": 180,
+      "targetPower": 86
+    }
+  ]
+}
