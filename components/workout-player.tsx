@@ -274,7 +274,7 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
   const initialLiveCoachRequestedRef = useRef(false);
   const lastLiveCoachCheckSecondRef = useRef(0);
   const lastAdaptivePlanSecondRef = useRef(0);
-  const recentLiveCoachFeedbackRef = useRef<string[]>([]);
+  const recentLiveCoachFeedbackRef = useRef<Array<{ role: "user" | "assistant"; text: string }>>([]);
   const rideGenerationRef = useRef(0);
   const coachSpeechRequestRef = useRef(0);
   const adaptiveVoiceRecorderRef = useRef<MediaRecorder | null>(null);
@@ -1096,15 +1096,20 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
               riderText: riderTextOverride?.trim() || adaptiveRideIntent.riderText,
             }
           : null;
+      // Record the rider's turn in conversation history before sending
+      if (riderTextOverride?.trim()) {
+        recentLiveCoachFeedbackRef.current = [
+          ...recentLiveCoachFeedbackRef.current,
+          { role: "user" as const, text: riderTextOverride.trim() },
+        ].slice(-8);
+      }
+
       const response = await fetch("/api/coach/live", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           intent,
-          conversationHistory: recentLiveCoachFeedbackRef.current.map((feedback) => ({
-            role: "assistant",
-            text: feedback,
-          })),
+          conversationHistory: recentLiveCoachFeedbackRef.current,
           riderText: riderTextOverride?.trim() || undefined,
           audioBase64: voiceAudio?.base64,
           audioFormat: voiceAudio?.format,
@@ -1179,8 +1184,8 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
         setLiveCoachDetail(null);
         recentLiveCoachFeedbackRef.current = [
           ...recentLiveCoachFeedbackRef.current,
-          text,
-        ].slice(-6);
+          { role: "assistant" as const, text },
+        ].slice(-8);
         audioService.playCoachMessage();
         void speakCoachText(text);
       }

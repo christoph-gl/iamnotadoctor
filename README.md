@@ -32,6 +32,7 @@ Because it's open-source and AI-friendly, you don't even need to be a developer 
 *   **Dev Server vs. Build Server:**
     *   **Dev Server (`npm run dev`):** This is what you run locally while writing code or letting your agent modify the app. It supports hot-reloading (your changes appear instantly in the browser) and compiles files on the fly, making development fast but the loaded code unoptimized.
     *   **Build Server (`npm run build`):** This compiles and optimizes the entire app for production, performing optimizations like minification and tree-shaking. It generates a highly optimized production bundle that runs much faster and with less overhead. Use this or `npm run start` once you're done editing and just want to run the app.
+    *   **Production Free Port (`npm run build:start` or `npm run start:free`):** Builds the production bundle and starts the production server on an automatically selected free port (e.g. in environments where port 3000 might be in use).
 
 ---
 

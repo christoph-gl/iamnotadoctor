@@ -13,6 +13,8 @@
     "dev:reset": "portless proxy stop || true && portless prune",
     "build": "next build",
     "start": "next start",
+    "start:free": "PORT=0 next start",
+    "build:start": "npm run build && npm run start:free",
     "lint": "eslint",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit"
