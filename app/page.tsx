@@ -187,6 +187,13 @@ export default function App() {
     }
   };
 
+  const applyProfileUpdate = async (profile: RiderProfile) => {
+    await saveRiderProfile(profile);
+    const saved = await getRiderProfile();
+    setRiderProfile(saved);
+    setSettingsProfile(saved);
+  };
+
   const currentHrZone = heartRate 
     ? riderProfile.hrZones.find(z => heartRate >= z.minBpm && heartRate <= z.maxBpm) 
     : undefined;
@@ -1003,6 +1010,12 @@ export default function App() {
            onPowerTargetChange={applyWorkoutTargetPower}
            onStopSession={handleStopSession}
            onWorkoutChange={(w) => activeWorkoutNameRef.current = w.name}
+           onResistanceModeRequest={(level) => {
+             setMode("resistance");
+             setResistance(level);
+             void applyResistance(level);
+           }}
+           onRiderProfileChange={applyProfileUpdate}
            manualControlMode={mode}
            power={power}
            cadence={cadence}
