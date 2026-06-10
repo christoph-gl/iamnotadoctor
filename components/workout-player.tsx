@@ -76,6 +76,8 @@ type AdaptiveVoiceAudio = {
   mimeType: string;
 };
 
+type AutomaticLiveCoachIntent = "ride_start_summary" | "periodic_ride_check" | "adaptive_plan";
+
 type TelemetrySnapshot = {
   offsetSeconds: number;
   durationSeconds: number;
@@ -169,6 +171,7 @@ const FIXED_TRACK_COACH_INTERVAL_OPTIONS = [1, 3, 5, 10, 15] as const;
 const DEFAULT_FIXED_TRACK_COACH_INTERVAL_MINUTES = 5;
 const ADAPTIVE_REWRITE_INTERVAL_OPTIONS = [null, 1, 2, 3, 5, 10, 15] as const;
 const DEFAULT_ADAPTIVE_REWRITE_INTERVAL_MINUTES = DEFAULT_ADAPTIVE_RIDE_INTENT.feedbackIntervalMinutes;
+const LIVE_COACH_RETRY_DELAY_SECONDS = 30;
 
 function clampAdaptiveFeedbackInterval(minutes: number) {
   return Math.max(1, Math.min(15, Math.round(minutes)));
@@ -289,6 +292,7 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
   const initialLiveCoachRequestedRef = useRef(false);
   const lastLiveCoachCheckSecondRef = useRef(0);
   const lastAdaptivePlanSecondRef = useRef(0);
+  const liveCoachRetryRef = useRef<{ intent: AutomaticLiveCoachIntent; atSecond: number } | null>(null);
   const recentLiveCoachFeedbackRef = useRef<Array<{ role: "user" | "assistant"; text: string }>>([]);
   const rideGenerationRef = useRef(0);
   const coachSpeechRequestRef = useRef(0);
@@ -708,6 +712,7 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
     initialLiveCoachRequestedRef.current = false;
     lastLiveCoachCheckSecondRef.current = 0;
     lastAdaptivePlanSecondRef.current = 0;
+    liveCoachRetryRef.current = null;
     recentLiveCoachFeedbackRef.current = [];
     setLiveCoachStatus("idle");
     setLiveCoachFeedback(null);
@@ -1136,7 +1141,8 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
   const requestLiveCoachCheck = useCallback(async (
     intent: "ride_start_summary" | "periodic_ride_check" | "adaptive_plan" | "adaptive_instruction",
     riderTextOverride?: string,
-    voiceAudio?: AdaptiveVoiceAudio
+    voiceAudio?: AdaptiveVoiceAudio,
+    retryOnFailure = true
   ) => {
     if (liveCoachRunningRef.current) return;
     const requestRideGeneration = rideGenerationRef.current;
@@ -1235,6 +1241,22 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
       }
       if (requestRideGeneration !== rideGenerationRef.current) return;
 
+      if (data?.degraded) {
+        if (retryOnFailure && intent !== "adaptive_instruction") {
+          liveCoachRetryRef.current = {
+            intent,
+            atSecond: elapsedSecondsRef.current + LIVE_COACH_RETRY_DELAY_SECONDS,
+          };
+        }
+        setLiveCoachStatus("error");
+        setLiveCoachDetail(
+          retryOnFailure && intent !== "adaptive_instruction"
+            ? `${data?.error || "Live coach is unavailable."} Retrying in ${LIVE_COACH_RETRY_DELAY_SECONDS} seconds.`
+            : data?.error || "Live coach is unavailable."
+        );
+        return;
+      }
+
       const text =
         typeof data?.action?.text === "string" && data.action.text.trim()
           ? data.action.text.trim()
@@ -1267,8 +1289,19 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
     } catch (err) {
       if (requestRideGeneration !== rideGenerationRef.current) return;
       console.error(err);
+      if (retryOnFailure && intent !== "adaptive_instruction") {
+        liveCoachRetryRef.current = {
+          intent,
+          atSecond: elapsedSecondsRef.current + LIVE_COACH_RETRY_DELAY_SECONDS,
+        };
+      }
       setLiveCoachStatus("error");
-      setLiveCoachDetail(err instanceof Error ? err.message : String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      setLiveCoachDetail(
+        retryOnFailure && intent !== "adaptive_instruction"
+          ? `${message} Retrying in ${LIVE_COACH_RETRY_DELAY_SECONDS} seconds.`
+          : message
+      );
     } finally {
       if (requestRideGeneration === rideGenerationRef.current) {
         liveCoachRunningRef.current = false;
@@ -1447,6 +1480,18 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
       { elapsedSeconds, power },
     ]);
 
+    const pendingRetry = liveCoachRetryRef.current;
+    if (pendingRetry && elapsedSeconds >= pendingRetry.atSecond && !liveCoachRunningRef.current) {
+      liveCoachRetryRef.current = null;
+      if (pendingRetry.intent === "adaptive_plan") {
+        lastAdaptivePlanSecondRef.current = elapsedSeconds;
+      } else if (pendingRetry.intent === "periodic_ride_check") {
+        lastLiveCoachCheckSecondRef.current = elapsedSeconds;
+      }
+      void requestLiveCoachCheck(pendingRetry.intent, undefined, undefined, false);
+      return;
+    }
+
     if (adaptive) {
       if (!adaptiveRewriteEnabled || adaptiveFeedbackIntervalSeconds === null) return;
 
@@ -1491,6 +1536,7 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
       initialLiveCoachRequestedRef.current = false;
       lastLiveCoachCheckSecondRef.current = 0;
       lastAdaptivePlanSecondRef.current = 0;
+      liveCoachRetryRef.current = null;
       recentLiveCoachFeedbackRef.current = [];
       liveCoachRunningRef.current = false;
       setLiveCoachStatus("idle");
