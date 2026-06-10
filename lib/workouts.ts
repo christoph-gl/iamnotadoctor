@@ -286,10 +286,12 @@ export function spliceUpcomingBlocks(
   current: Workout,
   elapsedSeconds: number,
   leadSeconds: number,
-  upcoming: WorkoutBlock[]
+  upcoming: WorkoutBlock[],
+  replaceDurationSeconds?: number
 ): Workout {
   const splicePoint = Math.max(elapsedSeconds + Math.max(leadSeconds, 0), 0);
   const kept: WorkoutBlock[] = [];
+  const following: WorkoutBlock[] = [];
   let acc = 0;
 
   for (const b of current.blocks) {
@@ -306,7 +308,25 @@ export function spliceUpcomingBlocks(
     break;
   }
 
-  return { ...current, blocks: [...kept, ...upcoming] };
+  if (typeof replaceDurationSeconds === "number" && replaceDurationSeconds > 0) {
+    const resumePoint = splicePoint + replaceDurationSeconds;
+    acc = 0;
+
+    for (const block of current.blocks) {
+      const blockStart = acc;
+      const blockEnd = acc + block.durationSeconds;
+      acc = blockEnd;
+
+      if (blockEnd <= resumePoint) continue;
+      if (blockStart < resumePoint) {
+        following.push({ ...block, durationSeconds: blockEnd - resumePoint });
+      } else {
+        following.push(block);
+      }
+    }
+  }
+
+  return { ...current, blocks: [...kept, ...upcoming, ...following] };
 }
 
 export const WORKOUTS: Workout[] = [

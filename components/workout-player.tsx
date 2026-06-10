@@ -40,7 +40,7 @@ import {
 } from "@/components/ui/dialog";
 
 export type WorkoutPlayerHandle = {
-  applyPlanCommand: (blocks: WorkoutBlock[], leadSeconds?: number) => void;
+  applyPlanCommand: (blocks: WorkoutBlock[], leadSeconds?: number, preserveFollowingTrack?: boolean) => void;
   applyErgOverrideUntilNextStep: (watts: number) => void;
   getRemainingWorkoutSnapshot: () => RemainingWorkoutSnapshot;
 };
@@ -327,7 +327,7 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
   );
 
   const applyPlanCommand = useCallback(
-    (blocks: WorkoutBlock[], leadSeconds: number = 20) => {
+    (blocks: WorkoutBlock[], leadSeconds: number = 20, preserveFollowingTrack = false) => {
       if (!Array.isArray(blocks) || blocks.length === 0) return;
       const safeBlocks: WorkoutBlock[] = blocks
         .map((b) => ({
@@ -337,8 +337,18 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
         .filter((b) => b.durationSeconds > 0);
       if (safeBlocks.length === 0) return;
 
+      const replacementDuration = safeBlocks.reduce(
+        (total, block) => total + block.durationSeconds,
+        0
+      );
       setWorkout((prev) =>
-        spliceUpcomingBlocks(prev, elapsedSecondsRef.current, leadSeconds, safeBlocks)
+        spliceUpcomingBlocks(
+          prev,
+          elapsedSecondsRef.current,
+          leadSeconds,
+          safeBlocks,
+          preserveFollowingTrack ? replacementDuration : undefined
+        )
       );
     },
     [clampPlanWatts]
@@ -1109,7 +1119,7 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
           typeof update.leadSeconds === "number" && Number.isFinite(update.leadSeconds)
             ? update.leadSeconds
             : 0;
-        applyPlanCommand(update.blocks, leadSeconds);
+        applyPlanCommand(update.blocks, leadSeconds, true);
       }
     },
     [applyPlanCommand]
@@ -1120,7 +1130,7 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
       if (!command || !allowTrainerChanges) return;
 
       if (command.type === "set_workout_plan") {
-        applyPlanCommand(command.blocks, command.leadSeconds ?? 5);
+        applyPlanCommand(command.blocks, command.leadSeconds ?? 5, adaptive);
         return;
       }
 
@@ -1135,7 +1145,7 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
         onPowerTargetChange(command.targetWatts);
       }
     },
-    [applyErgOverrideUntilNextStep, applyPlanCommand, onPowerTargetChange]
+    [adaptive, applyErgOverrideUntilNextStep, applyPlanCommand, onPowerTargetChange]
   );
 
   const requestLiveCoachCheck = useCallback(async (

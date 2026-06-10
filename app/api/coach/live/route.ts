@@ -275,6 +275,47 @@ function sanitizeLiveCoachAction(action: z.infer<typeof LiveCoachActionSchema>) 
   return action;
 }
 
+function describeAppliedAdaptiveAction(action: z.infer<typeof LiveCoachActionSchema>) {
+  if (action.action === "set_workout_plan" && action.blocks.length > 0) {
+    const blocks = action.blocks.slice(0, 30).map((block) => ({
+      durationSeconds: clampNumber(block.durationSeconds, 30, 600),
+      targetPower: clampNumber(block.targetPower, 50, 500),
+    }));
+    const durationMinutes = Math.max(
+      1,
+      Math.round(blocks.reduce((total, block) => total + block.durationSeconds, 0) / 60)
+    );
+    const targets = blocks.map((block) => block.targetPower);
+    const minTarget = Math.min(...targets);
+    const maxTarget = Math.max(...targets);
+    const targetText =
+      minTarget === maxTarget ? `${minTarget} watts` : `${minTarget} to ${maxTarget} watts`;
+
+    return {
+      ...action,
+      text: `Updated the next ${durationMinutes} minutes with targets from ${targetText}.`,
+    };
+  }
+
+  if (action.action === "update_adaptive_ride") {
+    const details: string[] = [];
+    if (typeof action.durationMinutes === "number") {
+      details.push(`${clampNumber(action.durationMinutes, 10, 240)} minutes total`);
+    }
+    if (action.blocks?.length) {
+      const targets = action.blocks.map((block) => clampNumber(block.targetPower, 50, 500));
+      const minTarget = Math.min(...targets);
+      const maxTarget = Math.max(...targets);
+      details.push(minTarget === maxTarget ? `${minTarget} watts next` : `${minTarget}-${maxTarget} watts next`);
+    }
+    if (details.length > 0) {
+      return { ...action, text: `Adaptive ride updated: ${details.join(", ")}.` };
+    }
+  }
+
+  return action;
+}
+
 function enableSpeechForFixedTrack(
   action: z.infer<typeof LiveCoachActionSchema>,
   intent: "adaptive_plan" | "adaptive_instruction" | "periodic_ride_check" | "ride_start_summary" | "coach_check"
@@ -647,8 +688,11 @@ If the rider reports pain, dizziness, chest pain, or wants to stop, lower intens
       messages: userContent,
     });
 
+    const sanitizedAction = sanitizeLiveCoachAction(result.object);
     const action = enableSpeechForFixedTrack(
-      sanitizeLiveCoachAction(result.object),
+      intent === "adaptive_plan" || intent === "adaptive_instruction"
+        ? describeAppliedAdaptiveAction(sanitizedAction)
+        : sanitizedAction,
       intent
     );
     const command = toCommand(action);
