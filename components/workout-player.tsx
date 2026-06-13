@@ -315,6 +315,50 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
   const totalDuration = adaptive ? adaptiveTargetDuration : workoutPlanDuration;
 
   useEffect(() => {
+    if (!adaptive || adaptiveTargetDuration <= 0) return;
+
+    setWorkout((current) => {
+      const currentDuration = current.blocks.reduce(
+        (total, block) => total + block.durationSeconds,
+        0
+      );
+      if (currentDuration === adaptiveTargetDuration) return current;
+
+      if (currentDuration < adaptiveTargetDuration) {
+        const fallbackTarget =
+          current.blocks[current.blocks.length - 1]?.targetPower ??
+          ADAPTIVE_FREERIDE.blocks[0].targetPower;
+        return {
+          ...current,
+          blocks: [
+            ...current.blocks,
+            {
+              durationSeconds: adaptiveTargetDuration - currentDuration,
+              targetPower: fallbackTarget,
+            },
+          ],
+        };
+      }
+
+      const resizedBlocks: WorkoutBlock[] = [];
+      let retainedDuration = 0;
+      for (const block of current.blocks) {
+        if (retainedDuration >= adaptiveTargetDuration) break;
+        const durationSeconds = Math.min(
+          block.durationSeconds,
+          adaptiveTargetDuration - retainedDuration
+        );
+        if (durationSeconds > 0) {
+          resizedBlocks.push({ ...block, durationSeconds });
+          retainedDuration += durationSeconds;
+        }
+      }
+
+      return { ...current, blocks: resizedBlocks };
+    });
+  }, [adaptive, adaptiveTargetDuration]);
+
+  useEffect(() => {
     elapsedSecondsRef.current = elapsedSeconds;
   }, [elapsedSeconds]);
 
@@ -1017,18 +1061,27 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
     coachSpeechRequestRef.current = requestId;
 
     try {
-      const response = await fetch("/api/coach/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
+      let audio: ArrayBuffer | null = null;
+      let lastError = "Coach speech failed";
 
-      if (!response.ok) {
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        const response = await fetch("/api/coach/tts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text }),
+        });
+
+        if (response.ok) {
+          audio = await response.arrayBuffer();
+          break;
+        }
+
         const data = await response.json().catch(() => null);
-        throw new Error(data?.error || "Coach speech failed");
+        lastError = data?.error || "Coach speech failed";
+        if (response.status < 500 || attempt === 1) break;
       }
 
-      const audio = await response.arrayBuffer();
+      if (!audio) throw new Error(lastError);
       if (coachSpeechRequestRef.current !== requestId) return;
       await audioService.playArrayBuffer(audio);
     } catch (err) {

@@ -28,7 +28,7 @@ const ttsVoice = resolveVoiceForModel(ttsModel, process.env.GROK_TTS_VOICE_ID);
 
 const ttsTimeoutMs = Math.min(
   30_000,
-  Math.max(2_000, Number(process.env.GROK_TTS_TIMEOUT_MS || 20_000))
+  Math.max(2_000, Number(process.env.GROK_TTS_TIMEOUT_MS || 30_000))
 );
 
 function sanitizeForSpeech(text: string) {
