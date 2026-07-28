@@ -518,12 +518,15 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
       ];
       setAllWorkouts(visibleWorkouts);
 
-      if (!visibleWorkouts.some((savedWorkout) => savedWorkout.id === workout.id)) {
-        setWorkout(visibleWorkouts[0] ?? ADAPTIVE_FREERIDE);
-      }
+      setWorkout((currentWorkout) => {
+        if (visibleWorkouts.some((savedWorkout) => savedWorkout.id === currentWorkout.id)) {
+          return currentWorkout;
+        }
+        return visibleWorkouts[0] ?? ADAPTIVE_FREERIDE;
+      });
     }
     loadSaved();
-  }, [workout.id]);
+  }, []);
 
   useEffect(() => {
     return () => {

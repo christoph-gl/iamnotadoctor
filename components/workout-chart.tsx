@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { memo, useState, useRef } from "react";
 import { RIDER_PROFILE, type RiderProfile } from "@/lib/profile";
 import { Workout, calculateWorkoutMetrics } from "@/lib/workouts";
 
@@ -11,7 +11,7 @@ function getColorForPower(power: number, riderProfile: RiderProfile) {
   return riderProfile.colors.ftp;
 }
 
-export function WorkoutChart({ 
+export const WorkoutChart = memo(function WorkoutChart({
   workout, 
   progressSeconds,
   onSeek,
@@ -285,4 +285,4 @@ export function WorkoutChart({
       </div>
     </div>
   );
-}
+});
