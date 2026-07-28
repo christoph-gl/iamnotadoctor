@@ -2,6 +2,7 @@ class AudioService {
   private ctx: AudioContext | null = null;
   private buffers: Record<string, AudioBuffer> = {};
   private isPreloading = false;
+  private speechSource: AudioBufferSourceNode | null = null;
 
   async init() {
     if (typeof window === 'undefined') return;
@@ -68,15 +69,34 @@ class AudioService {
     }
   }
 
-  async playArrayBuffer(arrayBuffer: ArrayBuffer) {
+  async playArrayBuffer(arrayBuffer: ArrayBuffer, shouldPlay?: () => boolean) {
     await this.init();
     if (!this.ctx) return;
 
     const audioBuffer = await this.ctx.decodeAudioData(arrayBuffer.slice(0));
+    if (shouldPlay && !shouldPlay()) return;
+    this.stopCoachSpeech();
     const source = this.ctx.createBufferSource();
     source.buffer = audioBuffer;
     source.connect(this.ctx.destination);
+    this.speechSource = source;
+    source.onended = () => {
+      if (this.speechSource === source) this.speechSource = null;
+      source.disconnect();
+    };
     source.start(0);
+  }
+
+  stopCoachSpeech() {
+    if (!this.speechSource) return;
+    const source = this.speechSource;
+    this.speechSource = null;
+    try {
+      source.stop();
+    } catch {
+      // The source may have ended between the check and stop().
+    }
+    source.disconnect();
   }
 
   playNotification() {

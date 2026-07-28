@@ -50,6 +50,33 @@ type RiderProfileRow = {
   memory_summary: string | null;
 };
 
+export type ApiCallLogInput = {
+  operation: string;
+  provider?: string;
+  model?: string;
+  voice?: string;
+  status: "success" | "error" | "timeout";
+  startedAt?: number;
+  durationMs?: number;
+  request?: unknown;
+  response?: unknown;
+  error?: unknown;
+};
+
+export type ApiCallLog = {
+  id: number;
+  createdAt: number;
+  operation: string;
+  provider?: string;
+  model?: string;
+  voice?: string;
+  status: ApiCallLogInput["status"];
+  durationMs?: number;
+  request: unknown;
+  response?: unknown;
+  error?: string;
+};
+
 const dbDir = path.join(process.cwd(), ".data");
 const dbPath = path.join(dbDir, "iamnotadoctor.sqlite");
 const legacyDbPath = path.join(dbDir, "kickr.sqlite");
@@ -115,6 +142,26 @@ export function getDb() {
         model TEXT,
         generated_at INTEGER NOT NULL
       );
+
+      CREATE TABLE IF NOT EXISTS api_call_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        created_at INTEGER NOT NULL,
+        operation TEXT NOT NULL,
+        provider TEXT,
+        model TEXT,
+        voice TEXT,
+        status TEXT NOT NULL,
+        duration_ms INTEGER,
+        request_json TEXT NOT NULL,
+        response_json TEXT,
+        error TEXT
+      );
+
+      CREATE INDEX IF NOT EXISTS api_call_logs_created_at_idx
+        ON api_call_logs(created_at DESC);
+
+      CREATE INDEX IF NOT EXISTS api_call_logs_operation_idx
+        ON api_call_logs(operation, created_at DESC);
     `);
     migrateRideSessionSummaries();
     dropLegacyAgentTables();
@@ -409,6 +456,123 @@ export function getRideSessionById(id: string): RideSession | null {
 
 export function deleteRideSessionById(id: string) {
   getDb().prepare("DELETE FROM ride_sessions WHERE id = ?").run(id);
+}
+
+function redactApiLogValue(value: unknown, depth = 0): unknown {
+  if (depth > 8) return "[truncated]";
+  if (value === null || typeof value === "number" || typeof value === "boolean") {
+    return value;
+  }
+  if (typeof value === "string") {
+    return value.length > 20_000 ? `${value.slice(0, 20_000)}…[truncated]` : value;
+  }
+  if (typeof Buffer !== "undefined" && Buffer.isBuffer(value)) {
+    return `[binary ${value.byteLength} bytes]`;
+  }
+  if (value instanceof ArrayBuffer) return `[binary ${value.byteLength} bytes]`;
+  if (Array.isArray(value)) return value.map((item) => redactApiLogValue(item, depth + 1));
+  if (typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, item]) => {
+        if (/api[-_]?key|authorization|token|secret/i.test(key)) {
+          return [key, "[redacted]"];
+        }
+        if (
+          typeof item === "string" &&
+          item.length > 1_000 &&
+          (/base64|audio|image|data/i.test(key) || item.startsWith("data:"))
+        ) {
+          return [key, `[redacted binary ${item.length} chars]`];
+        }
+        return [key, redactApiLogValue(item, depth + 1)];
+      })
+    );
+  }
+  return String(value);
+}
+
+function stringifyApiLogValue(value: unknown) {
+  try {
+    return JSON.stringify(redactApiLogValue(value)) ?? "null";
+  } catch {
+    return JSON.stringify({ error: "Unable to serialize API log value" });
+  }
+}
+
+function apiLogErrorMessage(error: unknown) {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  try {
+    return JSON.stringify(redactApiLogValue(error));
+  } catch {
+    return String(error);
+  }
+}
+
+export function recordApiCallLog(input: ApiCallLogInput) {
+  try {
+    getDb()
+      .prepare(
+        `INSERT INTO api_call_logs (
+          created_at, operation, provider, model, voice, status, duration_ms,
+          request_json, response_json, error
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(
+        input.startedAt ?? Date.now(),
+        input.operation,
+        input.provider ?? null,
+        input.model ?? null,
+        input.voice ?? null,
+        input.status,
+        input.durationMs ?? null,
+        stringifyApiLogValue(input.request ?? null),
+        input.response === undefined ? null : stringifyApiLogValue(input.response),
+        input.error === undefined ? null : apiLogErrorMessage(input.error)
+      );
+  } catch (error) {
+    console.error("Failed to persist API call log:", error);
+  }
+}
+
+export function listApiCallLogs(limit = 50): ApiCallLog[] {
+  const safeLimit = Math.min(200, Math.max(1, Math.floor(limit)));
+  const rows = getDb()
+    .prepare(
+      `SELECT id, created_at, operation, provider, model, voice, status,
+              duration_ms, request_json, response_json, error
+       FROM api_call_logs
+       ORDER BY created_at DESC, id DESC
+       LIMIT ?`
+    )
+    .all(safeLimit) as Array<{
+    id: number;
+    created_at: number;
+    operation: string;
+    provider: string | null;
+    model: string | null;
+    voice: string | null;
+    status: ApiCallLogInput["status"];
+    duration_ms: number | null;
+    request_json: string;
+    response_json: string | null;
+    error: string | null;
+  }>;
+
+  return rows.map((row) => ({
+    id: row.id,
+    createdAt: row.created_at,
+    operation: row.operation,
+    provider: row.provider ?? undefined,
+    model: row.model ?? undefined,
+    voice: row.voice ?? undefined,
+    status: row.status,
+    durationMs: row.duration_ms ?? undefined,
+    request: JSON.parse(row.request_json),
+    response: row.response_json ? JSON.parse(row.response_json) : undefined,
+    error: row.error ?? undefined,
+  }));
 }
 
 export function upsertMonthlySummary(month: string, summary: unknown, model?: string) {

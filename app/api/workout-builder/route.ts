@@ -149,6 +149,7 @@ export async function POST(req: Request) {
     const result = await generateObject({
       model: workoutBuilderModel,
       apiKey: workoutBuilderApiKey,
+      debugLabel: "workout-builder",
       messages: [
         {
           role: "user",

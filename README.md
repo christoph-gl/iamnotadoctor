@@ -166,6 +166,8 @@ The feedback is rendered below the Power/Cadence/HR card. `LIVE_COACH_TIMEOUT_MS
 
 Experimental spoken feedback can be enabled through the OpenRouter-compatible TTS lane. Set `OPENROUTER_API_KEY` or `GROK_TTS_API_KEY` in `.env.local`, and optionally `GROK_TTS_MODEL` / `GROK_TTS_VOICE_ID`. When a new coach message arrives, the browser still plays the local notification chime, then requests `POST /api/coach/tts`. The server returns MP3 audio for the browser to play. TTS failures are non-blocking; the text feedback remains visible.
 
+For local debugging, structured model calls and TTS requests/results are persisted in the SQLite `api_call_logs` table. The recent sanitized records are available at `GET /api/debug/api-calls?limit=50`; audio payloads are stored as metadata and binary content is not persisted.
+
 ## Post-Ride LLM Summaries
 
 When the rider taps **Finish & Save**, the workout player asks for optional free-text comments. The browser posts the full `RideSession` to `POST /api/sessions`; the server enriches it through `lib/ride-summary.ts` before writing to SQLite. If no summary model/key is configured, the ride still saves with `llmSummaryStatus: "skipped"`.

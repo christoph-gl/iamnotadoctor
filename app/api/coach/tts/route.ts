@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getOpenAIClient, openRouterApiKey as sharedOpenRouterApiKey } from "@/lib/llm-calls-env";
+import { recordApiCallLog } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +42,19 @@ function sanitizeForSpeech(text: string) {
 }
 
 export async function POST(request: Request) {
+  const startedAt = Date.now();
   if (!ttsApiKey) {
+    recordApiCallLog({
+      operation: "coach-tts",
+      provider: "openrouter",
+      model: ttsModel,
+      voice: ttsVoice,
+      status: "error",
+      startedAt,
+      durationMs: Date.now() - startedAt,
+      request: { text: null },
+      error: "No OpenRouter API key configured. Set OPENROUTER_API_KEY.",
+    });
     return NextResponse.json(
       { error: "No OpenRouter API key configured. Set OPENROUTER_API_KEY." },
       { status: 503 }
@@ -52,6 +65,17 @@ export async function POST(request: Request) {
   const text = sanitizeForSpeech(typeof body?.text === "string" ? body.text : "");
 
   if (!text) {
+    recordApiCallLog({
+      operation: "coach-tts",
+      provider: "openrouter",
+      model: ttsModel,
+      voice: ttsVoice,
+      status: "error",
+      startedAt,
+      durationMs: Date.now() - startedAt,
+      request: { text },
+      error: "Text is required.",
+    });
     return NextResponse.json({ error: "Text is required." }, { status: 400 });
   }
 
@@ -65,6 +89,21 @@ export async function POST(request: Request) {
       signal: AbortSignal.timeout(ttsTimeoutMs),
     });
     const audio = await response.arrayBuffer();
+    recordApiCallLog({
+      operation: "coach-tts",
+      provider: "openrouter",
+      model: ttsModel,
+      voice: ttsVoice,
+      status: "success",
+      startedAt,
+      durationMs: Date.now() - startedAt,
+      request: { text },
+      response: {
+        contentType: "audio/mpeg",
+        byteLength: audio.byteLength,
+        contentLengthHeader: response.headers.get("content-length"),
+      },
+    });
 
     return new Response(audio, {
       headers: {
@@ -82,6 +121,20 @@ export async function POST(request: Request) {
         ? error.status
         : undefined;
     const message = error instanceof Error ? error.message : String(error);
+    const timeout =
+      error instanceof Error &&
+      (error.name === "AbortError" || error.name === "TimeoutError" || /timeout|aborted/i.test(error.message));
+    recordApiCallLog({
+      operation: "coach-tts",
+      provider: "openrouter",
+      model: ttsModel,
+      voice: ttsVoice,
+      status: timeout ? "timeout" : "error",
+      startedAt,
+      durationMs: Date.now() - startedAt,
+      request: { text },
+      error: { message, providerStatus: status },
+    });
     return NextResponse.json(
       {
         error: message,

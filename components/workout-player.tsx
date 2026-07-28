@@ -261,6 +261,7 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
   const [adaptiveVoiceRecordingSeconds, setAdaptiveVoiceRecordingSeconds] = useState(0);
   const [upcomingChange, setUpcomingChange] = useState<{ nextTarget: number, currentTarget: number, seconds: number } | null>(null);
   const lastTargetRef = useRef<number | null>(null);
+  const lastUpcomingNotificationKeyRef = useRef<string | null>(null);
   const elapsedSecondsRef = useRef(0);
   const telemetrySamplesRef = useRef<Array<{
     elapsedSeconds: number;
@@ -612,13 +613,21 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
       if (i > newBlockIndex && workout.blocks[i].targetPower !== workout.blocks[newBlockIndex].targetPower) {
         const timeUntilNextChange = blockStart - elapsedSeconds;
         if (timeUntilNextChange > 0 && timeUntilNextChange <= 10) {
-          setUpcomingChange({ 
-            nextTarget: workout.blocks[i].targetPower, 
+          setUpcomingChange({
+            nextTarget: workout.blocks[i].targetPower,
             currentTarget: workout.blocks[newBlockIndex].targetPower,
-            seconds: timeUntilNextChange 
+            seconds: timeUntilNextChange,
           });
           foundUpcoming = true;
-          if (timeUntilNextChange === 10) {
+          const notificationKey = [
+            workout.id,
+            i,
+            blockStart,
+            workout.blocks[newBlockIndex].targetPower,
+            workout.blocks[i].targetPower,
+          ].join(":");
+          if (lastUpcomingNotificationKeyRef.current !== notificationKey) {
+            lastUpcomingNotificationKeyRef.current = notificationKey;
             audioService.playNotification();
           }
         }
@@ -627,6 +636,7 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
     }
     if (!foundUpcoming) {
       setUpcomingChange(null);
+      lastUpcomingNotificationKeyRef.current = null;
     }
 
     const currentTarget = workout.blocks[newBlockIndex].targetPower;
@@ -704,6 +714,7 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
     setActualPowerSamples([]);
     setUpcomingChange(null);
     lastTargetRef.current = null;
+    lastUpcomingNotificationKeyRef.current = null;
     clearRideRuntimeState();
   };
 
@@ -909,6 +920,7 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
   };
 
   const handleSeek = (seconds: number) => {
+    lastUpcomingNotificationKeyRef.current = null;
     setElapsedSeconds(seconds);
     let timeAcc = 0;
     let newBlockIndex = -1;
@@ -945,6 +957,7 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
   const speakCoachText = useCallback(async (text: string) => {
     const requestId = coachSpeechRequestRef.current + 1;
     coachSpeechRequestRef.current = requestId;
+    audioService.stopCoachSpeech();
 
     try {
       const response = await fetch("/api/coach/tts", {
@@ -960,7 +973,10 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
 
       const audio = await response.arrayBuffer();
       if (coachSpeechRequestRef.current !== requestId) return;
-      await audioService.playArrayBuffer(audio);
+      await audioService.playArrayBuffer(
+        audio,
+        () => coachSpeechRequestRef.current === requestId
+      );
     } catch (err) {
       console.warn("Coach speech unavailable:", err);
     }
@@ -1233,6 +1249,7 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
     if (minutes === null) {
       rideGenerationRef.current += 1;
       coachSpeechRequestRef.current += 1;
+      audioService.stopCoachSpeech();
       stopAdaptiveVoiceRecording();
       liveCoachRunningRef.current = false;
       lastAdaptivePlanSecondRef.current = elapsedSeconds;

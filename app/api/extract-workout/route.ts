@@ -27,6 +27,7 @@ export async function POST(request: Request) {
     const result = await generateObject({
       model: workoutImageExtractorModel,
       apiKey: workoutImageExtractorApiKey,
+      debugLabel: "extract-workout",
       messages: [
         {
           role: "user",

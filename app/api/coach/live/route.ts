@@ -510,6 +510,7 @@ export async function POST(request: Request) {
       const result = await generateObject({
         model: liveCoachModel,
         apiKey: liveCoachApiKey,
+        debugLabel: "live-coach/workout-plan-edit",
         abortSignal: AbortSignal.timeout(liveCoachTimeoutMs),
         maxRetries: 1,
         temperature: 0.2,
@@ -588,6 +589,7 @@ At most 30 blocks. At most 30 minutes total. Keep whole watts.`,
     const result = await generateObject({
       model: liveCoachModel,
       apiKey: liveCoachApiKey,
+      debugLabel: "live-coach",
       abortSignal: AbortSignal.timeout(
         intent === "adaptive_instruction"
           ? adaptiveVoiceCoachTimeoutMs

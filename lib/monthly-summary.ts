@@ -148,6 +148,7 @@ export async function summarizeMonth(
   const result = await generateObject({
     model: monthlySummaryModel,
     apiKey: monthlySummaryApiKey,
+    debugLabel: "monthly-summary",
     messages: [
       {
         role: "user",

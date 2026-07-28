@@ -282,6 +282,7 @@ export async function summarizeRideSession(
     const result = await generateObject({
       model: rideSummaryModel,
       apiKey: rideSummaryApiKey,
+      debugLabel: "ride-summary",
       messages: [{ role: "user", content: buildRideSummaryPrompt(payload) }],
       schema: RideSummarySchema,
     });

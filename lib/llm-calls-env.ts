@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 import { z } from "zod";
+import { recordApiCallLog } from "./db";
 
 /** Shared OpenRouter credentials. */
 export const openRouterApiKey =
@@ -32,6 +33,7 @@ type OpenRouterModelOptions = {
   abortSignal?: AbortSignal;
   maxOutputTokens?: number;
   maxRetries?: number;
+  debugLabel?: string;
 };
 
 export function getOpenAIClient(apiKey?: string) {
@@ -117,6 +119,7 @@ export async function generateObject<T extends z.ZodTypeAny>({
   abortSignal,
   maxOutputTokens,
   maxRetries = 1,
+  debugLabel = "structured-llm",
 }: OpenRouterModelOptions & { schema: T }): Promise<{ object: z.infer<T> }> {
   const client = getOpenAIClient(apiKey);
   const resolvedMessages = messages || (prompt ? [{ role: "user" as const, content: prompt }] : []);
@@ -126,6 +129,7 @@ export async function generateObject<T extends z.ZodTypeAny>({
 
   let lastError: unknown;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
+    const startedAt = Date.now();
     const messagesForAttempt =
       attempt === 0
         ? formattedMessages
@@ -139,8 +143,10 @@ export async function generateObject<T extends z.ZodTypeAny>({
             } as ChatCompletionMessageParam,
           ];
 
+    let rawText: string | undefined;
+    let response: OpenAI.Chat.Completions.ChatCompletion | undefined;
     try {
-      const response = await client.chat.completions.create(
+      response = await client.chat.completions.create(
         {
           model,
           messages: messagesForAttempt,
@@ -164,13 +170,55 @@ export async function generateObject<T extends z.ZodTypeAny>({
         }
       );
 
-      const text = response.choices[0]?.message?.content;
-      if (typeof text !== "string" || !text.trim()) {
+      rawText = response.choices[0]?.message?.content ?? undefined;
+      if (typeof rawText !== "string" || !rawText.trim()) {
         throw new Error("Empty structured response from model");
       }
 
-      return { object: schema.parse(parseJsonObject(text)) };
+      const object = schema.parse(parseJsonObject(rawText));
+      recordApiCallLog({
+        operation: debugLabel,
+        provider: "openrouter",
+        model,
+        status: "success",
+        startedAt,
+        durationMs: Date.now() - startedAt,
+        request: {
+          attempt: attempt + 1,
+          system,
+          messages: messagesForAttempt,
+          temperature,
+          maxOutputTokens,
+        },
+        response: {
+          rawText,
+          parsed: object,
+          finishReason: response.choices[0]?.finish_reason,
+          usage: response.usage,
+        },
+      });
+      return { object };
     } catch (error) {
+      const timeout =
+        error instanceof Error &&
+        (error.name === "AbortError" || error.name === "TimeoutError" || /timeout|aborted/i.test(error.message));
+      recordApiCallLog({
+        operation: debugLabel,
+        provider: "openrouter",
+        model,
+        status: timeout ? "timeout" : "error",
+        startedAt,
+        durationMs: Date.now() - startedAt,
+        request: {
+          attempt: attempt + 1,
+          system,
+          messages: messagesForAttempt,
+          temperature,
+          maxOutputTokens,
+        },
+        response: rawText ? { rawText, finishReason: response?.choices[0]?.finish_reason } : undefined,
+        error,
+      });
       lastError = error;
     }
   }
