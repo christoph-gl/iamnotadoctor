@@ -15,6 +15,7 @@ import {
   ADAPTIVE_FREERIDE,
   isAdaptiveFreeride,
   spliceUpcomingBlocks,
+  isPowerProfileTest,
 } from "@/lib/workouts";
 import { WorkoutChart } from "./workout-chart";
 import { Button } from "./ui/button";
@@ -22,6 +23,12 @@ import { Mic, Trash2 } from "lucide-react";
 import { RIDER_PROFILE, type RiderProfile } from "@/lib/profile";
 import { audioService } from "@/lib/audio";
 import type { LiveCoachCommand } from "@/lib/live-coach-command";
+import {
+  calculatePowerProfileEstimates,
+  POWER_PROFILE_RESULTS_READY_SECONDS,
+  type PowerProfileEstimate,
+  type PowerProfileMetric,
+} from "@/lib/power-profile-test";
 import {
   Dialog,
   DialogContent,
@@ -33,7 +40,7 @@ import {
 } from "@/components/ui/dialog";
 
 export type WorkoutPlayerHandle = {
-  applyPlanCommand: (blocks: WorkoutBlock[], leadSeconds?: number) => void;
+  applyPlanCommand: (blocks: WorkoutBlock[], leadSeconds?: number, preserveFollowingTrack?: boolean) => void;
   applyErgOverrideUntilNextStep: (watts: number) => void;
   getRemainingWorkoutSnapshot: () => RemainingWorkoutSnapshot;
 };
@@ -42,6 +49,8 @@ type WorkoutPlayerProps = {
   onPowerTargetChange: (watts: number) => void;
   onStopSession: (workoutName: string, riderComments?: string) => void;
   onWorkoutChange?: (workout: Workout) => void;
+  onResistanceModeRequest?: (level: number) => void;
+  onRiderProfileChange?: (profile: RiderProfile) => Promise<void> | void;
   manualControlMode?: "erg" | "resistance";
   disabled: boolean;
   power?: number;
@@ -66,6 +75,8 @@ type AdaptiveVoiceAudio = {
   format: string;
   mimeType: string;
 };
+
+type AutomaticLiveCoachIntent = "ride_start_summary" | "periodic_ride_check" | "adaptive_plan";
 
 type TelemetrySnapshot = {
   offsetSeconds: number;
@@ -160,6 +171,7 @@ const FIXED_TRACK_COACH_INTERVAL_OPTIONS = [1, 3, 5, 10, 15] as const;
 const DEFAULT_FIXED_TRACK_COACH_INTERVAL_MINUTES = 5;
 const ADAPTIVE_REWRITE_INTERVAL_OPTIONS = [null, 1, 2, 3, 5, 10, 15] as const;
 const DEFAULT_ADAPTIVE_REWRITE_INTERVAL_MINUTES = DEFAULT_ADAPTIVE_RIDE_INTENT.feedbackIntervalMinutes;
+const LIVE_COACH_RETRY_DELAY_SECONDS = 30;
 
 function clampAdaptiveFeedbackInterval(minutes: number) {
   return Math.max(1, Math.min(15, Math.round(minutes)));
@@ -204,6 +216,8 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
     onPowerTargetChange,
     onStopSession,
     onWorkoutChange,
+    onResistanceModeRequest,
+    onRiderProfileChange,
     manualControlMode = "erg",
     disabled,
     power,
@@ -227,6 +241,9 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
   const [isUploading, setIsUploading] = useState(false);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [isFinishOpen, setIsFinishOpen] = useState(false);
+  const [isFitnessResultsOpen, setIsFitnessResultsOpen] = useState(false);
+  const [isSavingFitnessResults, setIsSavingFitnessResults] = useState(false);
+  const [acceptedFitnessMetrics, setAcceptedFitnessMetrics] = useState<PowerProfileMetric[]>([]);
   const [finishComments, setFinishComments] = useState("");
   const [isBuilderOpen, setIsBuilderOpen] = useState(false);
   const [builderInstructions, setBuilderInstructions] = useState("");
@@ -262,6 +279,7 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
   const [upcomingChange, setUpcomingChange] = useState<{ nextTarget: number, currentTarget: number, seconds: number } | null>(null);
   const lastTargetRef = useRef<number | null>(null);
   const lastUpcomingNotificationKeyRef = useRef<string | null>(null);
+  const fitnessResultsPresentedRef = useRef(false);
   const elapsedSecondsRef = useRef(0);
   const telemetrySamplesRef = useRef<Array<{
     elapsedSeconds: number;
@@ -275,6 +293,7 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
   const initialLiveCoachRequestedRef = useRef(false);
   const lastLiveCoachCheckSecondRef = useRef(0);
   const lastAdaptivePlanSecondRef = useRef(0);
+  const liveCoachRetryRef = useRef<{ intent: AutomaticLiveCoachIntent; atSecond: number } | null>(null);
   const recentLiveCoachFeedbackRef = useRef<Array<{ role: "user" | "assistant"; text: string }>>([]);
   const rideGenerationRef = useRef(0);
   const coachSpeechRequestRef = useRef(0);
@@ -285,6 +304,7 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
   const zwoFileInputRef = useRef<HTMLInputElement>(null);
   const wakeLockRef = useRef<{ release: () => Promise<void> } | null>(null);
   const adaptive = isAdaptiveFreeride(workout);
+  const fitnessTest = isPowerProfileTest(workout);
   const isResistanceWorkoutMode = manualControlMode === "resistance" || activeTrainerMode.type === "resistance";
   const workoutPlanDuration = workout.blocks.reduce((acc, b) => acc + b.durationSeconds, 0);
   const adaptiveTargetDuration = Math.max(0, Math.round(adaptiveRideIntent.durationMinutes * 60));
@@ -294,6 +314,50 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
     : null;
   const fixedTrackCoachIntervalSeconds = fixedTrackCoachIntervalMinutes * 60;
   const totalDuration = adaptive ? adaptiveTargetDuration : workoutPlanDuration;
+
+  useEffect(() => {
+    if (!adaptive || adaptiveTargetDuration <= 0) return;
+
+    setWorkout((current) => {
+      const currentDuration = current.blocks.reduce(
+        (total, block) => total + block.durationSeconds,
+        0
+      );
+      if (currentDuration === adaptiveTargetDuration) return current;
+
+      if (currentDuration < adaptiveTargetDuration) {
+        const fallbackTarget =
+          current.blocks[current.blocks.length - 1]?.targetPower ??
+          ADAPTIVE_FREERIDE.blocks[0].targetPower;
+        return {
+          ...current,
+          blocks: [
+            ...current.blocks,
+            {
+              durationSeconds: adaptiveTargetDuration - currentDuration,
+              targetPower: fallbackTarget,
+            },
+          ],
+        };
+      }
+
+      const resizedBlocks: WorkoutBlock[] = [];
+      let retainedDuration = 0;
+      for (const block of current.blocks) {
+        if (retainedDuration >= adaptiveTargetDuration) break;
+        const durationSeconds = Math.min(
+          block.durationSeconds,
+          adaptiveTargetDuration - retainedDuration
+        );
+        if (durationSeconds > 0) {
+          resizedBlocks.push({ ...block, durationSeconds });
+          retainedDuration += durationSeconds;
+        }
+      }
+
+      return { ...current, blocks: resizedBlocks };
+    });
+  }, [adaptive, adaptiveTargetDuration]);
 
   useEffect(() => {
     elapsedSecondsRef.current = elapsedSeconds;
@@ -308,7 +372,7 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
   );
 
   const applyPlanCommand = useCallback(
-    (blocks: WorkoutBlock[], leadSeconds: number = 20) => {
+    (blocks: WorkoutBlock[], leadSeconds: number = 20, preserveFollowingTrack = false) => {
       if (!Array.isArray(blocks) || blocks.length === 0) return;
       const safeBlocks: WorkoutBlock[] = blocks
         .map((b) => ({
@@ -318,8 +382,18 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
         .filter((b) => b.durationSeconds > 0);
       if (safeBlocks.length === 0) return;
 
+      const replacementDuration = safeBlocks.reduce(
+        (total, block) => total + block.durationSeconds,
+        0
+      );
       setWorkout((prev) =>
-        spliceUpcomingBlocks(prev, elapsedSecondsRef.current, leadSeconds, safeBlocks)
+        spliceUpcomingBlocks(
+          prev,
+          elapsedSecondsRef.current,
+          leadSeconds,
+          safeBlocks,
+          preserveFollowingTrack ? replacementDuration : undefined
+        )
       );
     },
     [clampPlanWatts]
@@ -655,9 +729,26 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
     }
   }, [adaptive, currentTargetPower, elapsedSeconds, isPlaying, onPowerTargetChange, totalDuration, workout]);
 
+  const fitnessEstimates = fitnessTest
+    ? calculatePowerProfileEstimates(actualPowerSamples, riderProfile)
+    : null;
+
+  const openFitnessResultsIfReady = () => {
+    if (!fitnessTest || elapsedSeconds < POWER_PROFILE_RESULTS_READY_SECONDS || !fitnessEstimates) {
+      return false;
+    }
+    setAcceptedFitnessMetrics([]);
+    fitnessResultsPresentedRef.current = true;
+    setIsFitnessResultsOpen(true);
+    return true;
+  };
+
   const handlePlayPause = () => {
     audioService.init();
     if (!isPlaying) {
+      if (fitnessTest) {
+        onResistanceModeRequest?.(workout.resistanceLevel ?? 20);
+      }
       // Force immediate update on play
       let timeAcc = 0;
       let newBlockIndex = -1;
@@ -674,6 +765,8 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
         setCurrentTargetPower(currentTarget);
         onPowerTargetChange(currentTarget);
       }
+    } else {
+      openFitnessResultsIfReady();
     }
     setIsPlaying(!isPlaying);
   };
@@ -686,6 +779,7 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
     initialLiveCoachRequestedRef.current = false;
     lastLiveCoachCheckSecondRef.current = 0;
     lastAdaptivePlanSecondRef.current = 0;
+    liveCoachRetryRef.current = null;
     recentLiveCoachFeedbackRef.current = [];
     setLiveCoachStatus("idle");
     setLiveCoachFeedback(null);
@@ -713,6 +807,9 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
     setCurrentTargetPower(null);
     setActualPowerSamples([]);
     setUpcomingChange(null);
+    setIsFitnessResultsOpen(false);
+    setAcceptedFitnessMetrics([]);
+    fitnessResultsPresentedRef.current = false;
     lastTargetRef.current = null;
     lastUpcomingNotificationKeyRef.current = null;
     clearRideRuntimeState();
@@ -780,6 +877,26 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
     setFinishComments("");
     setIsFinishOpen(false);
     handleStop();
+  };
+
+  const applyFitnessEstimates = async (estimates: PowerProfileEstimate[]) => {
+    if (!onRiderProfileChange || estimates.length === 0) return;
+    setIsSavingFitnessResults(true);
+    try {
+      const nextProfile: RiderProfile = {
+        ...riderProfile,
+        fourDP: estimates.reduce(
+          (fourDP, estimate) => ({ ...fourDP, [estimate.metric]: estimate.newValue }),
+          riderProfile.fourDP
+        ),
+      };
+      await onRiderProfileChange(nextProfile);
+      setAcceptedFitnessMetrics((current) => [
+        ...new Set([...current, ...estimates.map((estimate) => estimate.metric)]),
+      ]);
+    } finally {
+      setIsSavingFitnessResults(false);
+    }
   };
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -960,18 +1077,27 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
     audioService.stopCoachSpeech();
 
     try {
-      const response = await fetch("/api/coach/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
+      let audio: ArrayBuffer | null = null;
+      let lastError = "Coach speech failed";
 
-      if (!response.ok) {
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        const response = await fetch("/api/coach/tts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text }),
+        });
+
+        if (response.ok) {
+          audio = await response.arrayBuffer();
+          break;
+        }
+
         const data = await response.json().catch(() => null);
-        throw new Error(data?.error || "Coach speech failed");
+        lastError = data?.error || "Coach speech failed";
+        if (response.status < 500 || attempt === 1) break;
       }
 
-      const audio = await response.arrayBuffer();
+      if (!audio) throw new Error(lastError);
       if (coachSpeechRequestRef.current !== requestId) return;
       await audioService.playArrayBuffer(
         audio,
@@ -1065,7 +1191,7 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
           typeof update.leadSeconds === "number" && Number.isFinite(update.leadSeconds)
             ? update.leadSeconds
             : 0;
-        applyPlanCommand(update.blocks, leadSeconds);
+        applyPlanCommand(update.blocks, leadSeconds, true);
       }
     },
     [applyPlanCommand]
@@ -1076,7 +1202,7 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
       if (!command || !allowTrainerChanges) return;
 
       if (command.type === "set_workout_plan") {
-        applyPlanCommand(command.blocks, command.leadSeconds ?? 5);
+        applyPlanCommand(command.blocks, command.leadSeconds ?? 5, adaptive);
         return;
       }
 
@@ -1091,13 +1217,14 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
         onPowerTargetChange(command.targetWatts);
       }
     },
-    [applyErgOverrideUntilNextStep, applyPlanCommand, onPowerTargetChange]
+    [adaptive, applyErgOverrideUntilNextStep, applyPlanCommand, onPowerTargetChange]
   );
 
   const requestLiveCoachCheck = useCallback(async (
     intent: "ride_start_summary" | "periodic_ride_check" | "adaptive_plan" | "adaptive_instruction",
     riderTextOverride?: string,
-    voiceAudio?: AdaptiveVoiceAudio
+    voiceAudio?: AdaptiveVoiceAudio,
+    retryOnFailure = true
   ) => {
     if (liveCoachRunningRef.current) return;
     const requestRideGeneration = rideGenerationRef.current;
@@ -1136,6 +1263,11 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
           snapshot: {
             generatedAtIso: new Date().toISOString(),
             workoutName: workout.name,
+            workoutContext: {
+              kind: workout.kind ?? null,
+              trainerMode: workout.trainerMode ?? null,
+              coachInstructions: workout.coachInstructions ?? null,
+            },
             latestSample: latestSnapshot
               ? {
                   powerW: latestSnapshot.power,
@@ -1191,6 +1323,22 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
       }
       if (requestRideGeneration !== rideGenerationRef.current) return;
 
+      if (data?.degraded) {
+        if (retryOnFailure && intent !== "adaptive_instruction") {
+          liveCoachRetryRef.current = {
+            intent,
+            atSecond: elapsedSecondsRef.current + LIVE_COACH_RETRY_DELAY_SECONDS,
+          };
+        }
+        setLiveCoachStatus("error");
+        setLiveCoachDetail(
+          retryOnFailure && intent !== "adaptive_instruction"
+            ? `${data?.error || "Live coach is unavailable."} Retrying in ${LIVE_COACH_RETRY_DELAY_SECONDS} seconds.`
+            : data?.error || "Live coach is unavailable."
+        );
+        return;
+      }
+
       const text =
         typeof data?.action?.text === "string" && data.action.text.trim()
           ? data.action.text.trim()
@@ -1223,8 +1371,19 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
     } catch (err) {
       if (requestRideGeneration !== rideGenerationRef.current) return;
       console.error(err);
+      if (retryOnFailure && intent !== "adaptive_instruction") {
+        liveCoachRetryRef.current = {
+          intent,
+          atSecond: elapsedSecondsRef.current + LIVE_COACH_RETRY_DELAY_SECONDS,
+        };
+      }
       setLiveCoachStatus("error");
-      setLiveCoachDetail(err instanceof Error ? err.message : String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      setLiveCoachDetail(
+        retryOnFailure && intent !== "adaptive_instruction"
+          ? `${message} Retrying in ${LIVE_COACH_RETRY_DELAY_SECONDS} seconds.`
+          : message
+      );
     } finally {
       if (requestRideGeneration === rideGenerationRef.current) {
         liveCoachRunningRef.current = false;
@@ -1241,8 +1400,21 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
     getRemainingWorkoutSnapshot,
     riderProfile,
     speakCoachText,
-    workout.name,
+    workout,
   ]);
+
+  useEffect(() => {
+    if (
+      fitnessTest &&
+      elapsedSeconds >= totalDuration &&
+      fitnessEstimates &&
+      !fitnessResultsPresentedRef.current &&
+      !isFitnessResultsOpen
+    ) {
+      fitnessResultsPresentedRef.current = true;
+      setIsFitnessResultsOpen(true);
+    }
+  }, [elapsedSeconds, fitnessEstimates, fitnessTest, isFitnessResultsOpen, totalDuration]);
 
   const handleAdaptiveRewriteIntervalSelect = (minutes: number | null) => {
     setAdaptiveRewriteIntervalMinutes(minutes);
@@ -1391,6 +1563,18 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
       { elapsedSeconds, power },
     ]);
 
+    const pendingRetry = liveCoachRetryRef.current;
+    if (pendingRetry && elapsedSeconds >= pendingRetry.atSecond && !liveCoachRunningRef.current) {
+      liveCoachRetryRef.current = null;
+      if (pendingRetry.intent === "adaptive_plan") {
+        lastAdaptivePlanSecondRef.current = elapsedSeconds;
+      } else if (pendingRetry.intent === "periodic_ride_check") {
+        lastLiveCoachCheckSecondRef.current = elapsedSeconds;
+      }
+      void requestLiveCoachCheck(pendingRetry.intent, undefined, undefined, false);
+      return;
+    }
+
     if (adaptive) {
       if (!adaptiveRewriteEnabled || adaptiveFeedbackIntervalSeconds === null) return;
 
@@ -1435,6 +1619,7 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
       initialLiveCoachRequestedRef.current = false;
       lastLiveCoachCheckSecondRef.current = 0;
       lastAdaptivePlanSecondRef.current = 0;
+      liveCoachRetryRef.current = null;
       recentLiveCoachFeedbackRef.current = [];
       liveCoachRunningRef.current = false;
       setLiveCoachStatus("idle");
@@ -1678,8 +1863,14 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
                   return (
                     <div 
                       key={w.id} 
-                      className={`flex flex-col gap-3 p-4 border rounded-md cursor-pointer transition-all hover:border-primary/50 group ${
-                        isActive ? "bg-primary/5 border-primary shadow-sm" : "bg-card hover:bg-muted/30"
+                      className={`flex flex-col gap-3 p-4 border rounded-md cursor-pointer transition-all group ${
+                        isPowerProfileTest(w)
+                          ? isActive
+                            ? "border-violet-500 bg-violet-500/10 shadow-sm"
+                            : "border-violet-500/40 bg-violet-500/5 hover:border-violet-500/70 hover:bg-violet-500/10"
+                          : isActive
+                            ? "bg-primary/5 border-primary shadow-sm"
+                            : "bg-card hover:bg-muted/30 hover:border-primary/50"
                       }`}
                       onClick={() => {
                         if (isAdaptiveFreeride(w)) {
@@ -1688,6 +1879,9 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
                           return;
                         }
                         setWorkout(w);
+                        if (isPowerProfileTest(w)) {
+                          onResistanceModeRequest?.(w.resistanceLevel ?? 20);
+                        }
                         setUnsavedBuiltWorkoutId(null);
                         setBuilderRationale(null);
                         handleStop();
@@ -1696,9 +1890,14 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
                     >
                       <div className="flex justify-between items-start gap-3">
                         <div className="flex flex-col gap-0.5">
-                          <span className={`font-bold text-base ${isActive ? "text-primary" : ""}`}>
+                          <span className={`font-bold text-base ${isPowerProfileTest(w) ? "text-violet-600 dark:text-violet-400" : isActive ? "text-primary" : ""}`}>
                             {w.name}
                           </span>
+                          {isPowerProfileTest(w) && (
+                            <span className="w-fit rounded-full bg-violet-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-700 dark:text-violet-300">
+                              Fitness Test · Resistance Mode
+                            </span>
+                          )}
                           <div className="flex gap-4 text-xs text-muted-foreground font-medium">
                             <span className="flex gap-1 items-center">
                               <span className="opacity-70">Duration:</span>
@@ -1746,6 +1945,61 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
           </Dialog>
         </div>
       </div>
+
+      <Dialog open={isFitnessResultsOpen} onOpenChange={setIsFitnessResultsOpen}>
+        <DialogContent className="sm:max-w-2xl rounded-md">
+          <DialogHeader>
+            <DialogTitle>Power Profile Test Results</DialogTitle>
+            <DialogDescription>
+              Compare the measured maximal efforts with the current rider profile. Apply any result individually or accept all four.
+            </DialogDescription>
+          </DialogHeader>
+          {fitnessEstimates ? (
+            <div className="grid gap-2">
+              {fitnessEstimates.map((estimate) => {
+                const accepted = acceptedFitnessMetrics.includes(estimate.metric);
+                return (
+                  <div key={estimate.metric} className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-4 rounded-md border p-3">
+                    <div>
+                      <div className="font-bold">{estimate.label}</div>
+                      <div className="text-xs text-muted-foreground">{estimate.durationLabel} average</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Old</div>
+                      <div className="font-mono font-bold">{estimate.oldValue} W</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">New</div>
+                      <div className="font-mono text-lg font-bold text-violet-600 dark:text-violet-400">{estimate.newValue} W</div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant={accepted ? "secondary" : "outline"}
+                      disabled={accepted || isSavingFitnessResults}
+                      onClick={() => void applyFitnessEstimates([estimate])}
+                    >
+                      {accepted ? "Applied" : "Use value"}
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
+              There is not enough valid power data across every test effort to calculate all four values.
+            </p>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsFitnessResultsOpen(false)}>Close</Button>
+            <Button
+              disabled={!fitnessEstimates || isSavingFitnessResults || acceptedFitnessMetrics.length === 4}
+              onClick={() => fitnessEstimates && void applyFitnessEstimates(fitnessEstimates)}
+            >
+              {acceptedFitnessMetrics.length === 4 ? "All Applied" : "Accept All"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <WorkoutChart
         workout={workout}
@@ -1985,6 +2239,19 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
           <div className="flex items-center gap-2">
             {disabled && (
               <p className="text-[10px] text-red-500 font-semibold mr-2">Connect trainer to control</p>
+            )}
+
+            {elapsedSeconds > 0 && !isPlaying && (
+              fitnessEstimates && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 border-violet-500/40 text-xs font-semibold text-violet-700 hover:bg-violet-500/10 dark:text-violet-300"
+                  onClick={() => setIsFitnessResultsOpen(true)}
+                >
+                  Review Test Results
+                </Button>
+              )
             )}
 
             {elapsedSeconds > 0 && !isPlaying && (

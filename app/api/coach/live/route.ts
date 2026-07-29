@@ -23,6 +23,10 @@ const liveCoachTimeoutMs = Math.min(
   30_000,
   Math.max(1_000, Number(process.env.LIVE_COACH_TIMEOUT_MS || 8_000))
 );
+const fixedTrackCoachTimeoutMs = Math.min(
+  30_000,
+  Math.max(liveCoachTimeoutMs, Number(process.env.FIXED_TRACK_COACH_TIMEOUT_MS || 15_000))
+);
 const adaptiveCoachTimeoutMs = Math.min(
   30_000,
   Math.max(liveCoachTimeoutMs, Number(process.env.ADAPTIVE_COACH_TIMEOUT_MS || 15_000))
@@ -38,8 +42,8 @@ const adaptiveVoiceCoachTimeoutMs = Math.min(
 const RiderCueSchema = z
   .string()
   .min(1)
-  .max(500)
-  .describe("One rider-facing coaching comment, at most 2-3 short sentences. Never repeat a sentence or phrase.");
+  .max(360)
+  .describe("One rider-facing coaching comment, at most 2 short complete sentences. Never repeat a sentence or phrase.");
 
 const ActionReasonSchema = z
   .string()
@@ -253,7 +257,7 @@ function sanitizeRiderCue(value: unknown) {
   const normalized = value.replace(/\s+/g, " ").trim();
   if (!normalized) return undefined;
 
-  const maxLength = 500;
+  const maxLength = 360;
   if (normalized.length <= maxLength) return normalized;
 
   const clipped = normalized.slice(0, maxLength);
@@ -270,6 +274,47 @@ function sanitizeLiveCoachAction(action: z.infer<typeof LiveCoachActionSchema>) 
   if ("text" in action) {
     const text = sanitizeRiderCue(action.text);
     if (text) return { ...action, text };
+  }
+
+  return action;
+}
+
+function describeAppliedAdaptiveAction(action: z.infer<typeof LiveCoachActionSchema>) {
+  if (action.action === "set_workout_plan" && action.blocks.length > 0) {
+    const blocks = action.blocks.slice(0, 30).map((block) => ({
+      durationSeconds: clampNumber(block.durationSeconds, 30, 600),
+      targetPower: clampNumber(block.targetPower, 50, 500),
+    }));
+    const durationMinutes = Math.max(
+      1,
+      Math.round(blocks.reduce((total, block) => total + block.durationSeconds, 0) / 60)
+    );
+    const targets = blocks.map((block) => block.targetPower);
+    const minTarget = Math.min(...targets);
+    const maxTarget = Math.max(...targets);
+    const targetText =
+      minTarget === maxTarget ? `${minTarget} watts` : `${minTarget} to ${maxTarget} watts`;
+
+    return {
+      ...action,
+      text: `Updated the next ${durationMinutes} minutes with targets from ${targetText}.`,
+    };
+  }
+
+  if (action.action === "update_adaptive_ride") {
+    const details: string[] = [];
+    if (typeof action.durationMinutes === "number") {
+      details.push(`${clampNumber(action.durationMinutes, 10, 240)} minutes total`);
+    }
+    if (action.blocks?.length) {
+      const targets = action.blocks.map((block) => clampNumber(block.targetPower, 50, 500));
+      const minTarget = Math.min(...targets);
+      const maxTarget = Math.max(...targets);
+      details.push(minTarget === maxTarget ? `${minTarget} watts next` : `${minTarget}-${maxTarget} watts next`);
+    }
+    if (details.length > 0) {
+      return { ...action, text: `Adaptive ride updated: ${details.join(", ")}.` };
+    }
   }
 
   return action;
@@ -369,6 +414,7 @@ function compactSnapshot(value: unknown) {
   const fourDP = getRecord(riderProfile?.fourDP);
   const rolling = getRecord(snapshot.rolling);
   const adaptiveRideIntent = getRecord(snapshot.adaptiveRideIntent);
+  const workoutContext = getRecord(snapshot.workoutContext);
   const rollingSnapshots = Array.isArray(rolling?.snapshots)
     ? rolling.snapshots
         .slice(-20)
@@ -406,6 +452,13 @@ function compactSnapshot(value: unknown) {
         }
       : null,
     workoutName: compactString(snapshot.workoutName, 120),
+    workoutContext: workoutContext
+      ? {
+          kind: compactString(workoutContext.kind, 40),
+          trainerMode: compactString(workoutContext.trainerMode, 40),
+          coachInstructions: compactString(workoutContext.coachInstructions, 1_200),
+        }
+      : null,
     latestSample: latestSample
       ? {
           powerW: compactNumber(latestSample.powerW),
@@ -595,7 +648,9 @@ At most 30 blocks. At most 30 minutes total. Keep whole watts.`,
           ? adaptiveVoiceCoachTimeoutMs
           : intent === "adaptive_plan"
             ? adaptiveCoachTimeoutMs
-            : liveCoachTimeoutMs
+            : intent === "periodic_ride_check" || intent === "ride_start_summary"
+              ? fixedTrackCoachTimeoutMs
+              : liveCoachTimeoutMs
       ),
       maxRetries: 1,
       temperature:
@@ -610,7 +665,7 @@ At most 30 blocks. At most 30 minutes total. Keep whole watts.`,
       system: `You are the low-latency live ride coach inside a smart trainer web app.
 
 CRITICAL OUTPUT RULES — apply to EVERY response:
-• The text field must be 1 to 3 short sentences. Never exceed 3 sentences.
+• The text field must be 1 or 2 short, complete sentences and stay under 360 characters.
 • Never repeat a sentence, clause, or phrase — even rephrased. Say it once, then stop.
 • Do not pad with encouragement filler. One brief motivational remark is fine; two is the absolute limit.
 • Never end mid-sentence. End on a complete sentence.
@@ -625,8 +680,9 @@ Available executable actions:
 When action is send_message, include a non-empty text field with the exact rider-facing words to display.
 Do not use send_message when the rider clearly asks to change watts or resistance and the snapshot says the trainer is connected.
 For coach_check without a specific rider request, prefer one concise rider-facing comment unless telemetry clearly calls for ERG or resistance adjustment.
-For ride_start_summary during a preplanned workout, return send_message only and set speak true. Give a coach-like opening in 2 to 3 short sentences: name the workout, summarize the target-power pattern, and give one thing to watch for early. Do not merely welcome the rider. Do not return set_workout_plan, set_erg_watts, or set_resistance for ride_start_summary.
+For ride_start_summary during a preplanned workout, return send_message only and set speak true. Give a coach-like opening in exactly 2 short sentences: name the workout and target-power pattern, then give one thing to watch for early. Do not merely welcome the rider. Do not return set_workout_plan, set_erg_watts, or set_resistance for ride_start_summary.
 For periodic_ride_check during a preplanned workout, return send_message only and set speak true. Use rider profile, heart-rate zones, rolling snapshots, ride-so-far averages, and remainingWorkout to give one coach-like comment about how the ride is going and what to focus on next. Rotate focus across power, cadence, heart-rate trend, workout progress, the next block, breathing, posture, fueling, and pacing. Do not repeat the topic or phrasing from conversationHistory. Do not return set_workout_plan, set_erg_watts, or set_resistance for periodic_ride_check.
+When snapshot.workoutContext.coachInstructions is present, treat it as the protocol-specific coaching brief. Follow it closely for ride_start_summary and periodic_ride_check. For a fitness test in resistance mode, do not coach the rider to hold the chart target watts and do not request trainer-load changes.
 When rider text is included, treat it as the latest chat message from the rider.
 Use set_workout_plan for requests that mention the workout, track, plan, remaining work, rest of workout, next N minutes, compressing duration, stretching duration, or scaling effort over time.
 snapshot.remainingWorkout.remainingBlocks is the source of truth for the remaining track. It starts at the rider's current point with offsetSeconds 0 and includes durationSeconds and targetPower for each block. Use currentBlockDurationSeconds and currentBlockElapsedSeconds to understand heart rate lag/drift and pacing.
@@ -640,8 +696,11 @@ If the rider reports pain, dizziness, chest pain, or wants to stop, lower intens
       messages: userContent,
     });
 
+    const sanitizedAction = sanitizeLiveCoachAction(result.object);
     const action = enableSpeechForFixedTrack(
-      sanitizeLiveCoachAction(result.object),
+      intent === "adaptive_plan" || intent === "adaptive_instruction"
+        ? describeAppliedAdaptiveAction(sanitizedAction)
+        : sanitizedAction,
       intent
     );
     const command = toCommand(action);

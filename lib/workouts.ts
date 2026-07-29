@@ -10,6 +10,10 @@ export type Workout = {
   name: string;
   description: string;
   blocks: WorkoutBlock[];
+  kind?: "fitness-test";
+  trainerMode?: "erg" | "resistance";
+  resistanceLevel?: number;
+  coachInstructions?: string;
 };
 
 export type LLMWorkoutBlock = {
@@ -230,6 +234,7 @@ export async function getWorkoutLibrary(): Promise<{
 }
 
 export const ADAPTIVE_FREERIDE_ID = "adaptive-freeride";
+export const POWER_PROFILE_TEST_ID = "power-profile-test";
 
 export const ADAPTIVE_FREERIDE: Workout = {
   id: ADAPTIVE_FREERIDE_ID,
@@ -243,14 +248,50 @@ export function isAdaptiveFreeride(workout: Workout) {
   return workout.id === ADAPTIVE_FREERIDE_ID;
 }
 
+export function isPowerProfileTest(workout: Workout) {
+  return workout.id === POWER_PROFILE_TEST_ID || workout.kind === "fitness-test";
+}
+
+const POWER_PROFILE_TEST: Workout = {
+  id: POWER_PROFILE_TEST_ID,
+  name: "Power Profile Test",
+  description:
+    "A 79-minute resistance-mode test with maximal 5-second, 1-minute, 5-minute, and 20-minute efforts to estimate NM, AC, MAP, and FTP.",
+  kind: "fitness-test",
+  trainerMode: "resistance",
+  resistanceLevel: 20,
+  coachInstructions:
+    "This is a maximal power-profile assessment, not a normal ERG workout. The trainer is in resistance mode. Coach the rider through the protocol: progressive warm-up, easy preparation, all-out 5-second NM sprint at 20:00, maximal sustainable 1-minute AC effort at 25:00, maximal sustainable 5-minute MAP effort at 34:00, and best sustainable 20-minute FTP effort at 49:00. During recovery, prioritize actual recovery. Before each test effort, explain pacing and timing briefly. Never tell the rider to match the chart watts; the measured power determines the result.",
+  blocks: [
+    ...Array.from({ length: 15 }, (_, index) => ({
+      durationSeconds: 60,
+      targetPower: 80 + Math.round((60 * index) / 14),
+    })),
+    { durationSeconds: 300, targetPower: 120 },
+    { durationSeconds: 5, targetPower: 821 },
+    { durationSeconds: 295, targetPower: 100 },
+    { durationSeconds: 60, targetPower: 335 },
+    { durationSeconds: 480, targetPower: 100 },
+    { durationSeconds: 300, targetPower: 216 },
+    { durationSeconds: 600, targetPower: 100 },
+    { durationSeconds: 1200, targetPower: 172 },
+    ...Array.from({ length: 10 }, (_, index) => ({
+      durationSeconds: 60,
+      targetPower: 100 - Math.round((30 * index) / 9),
+    })),
+  ],
+};
+
 export function spliceUpcomingBlocks(
   current: Workout,
   elapsedSeconds: number,
   leadSeconds: number,
-  upcoming: WorkoutBlock[]
+  upcoming: WorkoutBlock[],
+  replaceDurationSeconds?: number
 ): Workout {
   const splicePoint = Math.max(elapsedSeconds + Math.max(leadSeconds, 0), 0);
   const kept: WorkoutBlock[] = [];
+  const following: WorkoutBlock[] = [];
   let acc = 0;
 
   for (const b of current.blocks) {
@@ -267,7 +308,25 @@ export function spliceUpcomingBlocks(
     break;
   }
 
-  return { ...current, blocks: [...kept, ...upcoming] };
+  if (typeof replaceDurationSeconds === "number" && replaceDurationSeconds > 0) {
+    const resumePoint = splicePoint + replaceDurationSeconds;
+    acc = 0;
+
+    for (const block of current.blocks) {
+      const blockStart = acc;
+      const blockEnd = acc + block.durationSeconds;
+      acc = blockEnd;
+
+      if (blockEnd <= resumePoint) continue;
+      if (blockStart < resumePoint) {
+        following.push({ ...block, durationSeconds: blockEnd - resumePoint });
+      } else {
+        following.push(block);
+      }
+    }
+  }
+
+  return { ...current, blocks: [...kept, ...upcoming, ...following] };
 }
 
 export const WORKOUTS: Workout[] = [
@@ -314,5 +373,6 @@ export const WORKOUTS: Workout[] = [
       { durationSeconds: 600, targetPower: 160 },
       { durationSeconds: 300, targetPower: 100 },
     ]
-  }
+  },
+  POWER_PROFILE_TEST,
 ];
