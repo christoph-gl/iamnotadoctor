@@ -2,6 +2,16 @@
 
 This document provides instructions and context for any Large Language Model (LLM) or AI agent working on the iamnotadoctor project.
 
+## Public-facing release convention
+
+Whenever changes are pushed to the `public-facing` branch:
+
+- Update the current public-facing version line at the top of `README.md`.
+- Add or update the corresponding dated release entry in `CHANGELOG.md`.
+- Keep the README version and changelog release number aligned.
+
+The current public-facing release is version `0.2`.
+
 ## Fresh Public-URL Agent Behavior
 
 If the user gives only the public GitHub URL, or says “try this again”, “implement it”, “first”, or similar after sharing the URL, assume they want the first useful setup path:

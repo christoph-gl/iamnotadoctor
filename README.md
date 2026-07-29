@@ -1,5 +1,7 @@
 # iamnotadoctor
 
+> Current public-facing version: **0.2**
+
 It all started in December. I bought a smart bike ergometer (a Wahoo Kickr Core 2, to be precise), excited to get some winter miles in. At first, I was thrilled to find a nice, polished cycling app that seemingly did *not* lock everything behind a subscription model. But alas, three months later, the honeymoon phase ended. It turned out it was just a free trial, and they wanted to charge me €20/month just to control my trainer—which, let's be honest, is pretty basic technology. 
 
 I looked at alternatives like Zwift, but honestly, all those flashing numbers, virtual avatars, and gamified UI elements are just way too noisy for my attention-deficit brain (jokingly). I didn't want a 3D video game; I just wanted to ride my bike, control the resistance, look at my metrics, and listen to music or watch a video in peace.

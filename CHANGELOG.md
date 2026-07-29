@@ -2,12 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased] - 2026-06-07
+## [0.2] - 2026-07-29
 
 ### Added
 - Added package scripts for convenience in production/sandbox execution:
   - `start:free`: Starts the Next.js production server on an automatically allocated free port (`PORT=0`).
   - `build:start`: Builds the production bundle and runs it on a free port in one command.
+- Added SQLite-backed API call logging for structured LLM requests/results and TTS requests/results.
+- Added the local `GET /api/debug/api-calls?limit=50` endpoint for inspecting sanitized recent AI calls.
 
 ### Fixed
 - Fixed LLM repetition and looping responses in the Live Coach API (`POST /api/coach/live`):
@@ -17,3 +19,5 @@ All notable changes to this project will be documented in this file.
   - Raised default temperature to `0.4` for adaptive instructions to increase response diversity.
   - Reduced overall token budget boundaries (`maxOutputTokens` from `1800` to `1200` for adaptive intents, and `1200` to `800` for non-adaptive intents) to prevent rambling.
   - Replaced the post-processing deduplication/regex-cleansing logic with these upstream fixes to preserve output naturalness.
+- Prevented overlapping or stale coach speech from interrupting the current spoken message.
+- Deduplicated the 10-second pre-transition resistance notification so each resistance change is announced once.
