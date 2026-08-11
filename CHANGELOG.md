@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.2] - 2026-07-29
+## [0.3] - 2026-08-11
 
 ### Added
 - Added package scripts for convenience in production/sandbox execution:
@@ -21,3 +21,5 @@ All notable changes to this project will be documented in this file.
   - Replaced the post-processing deduplication/regex-cleansing logic with these upstream fixes to preserve output naturalness.
 - Prevented overlapping or stale coach speech from interrupting the current spoken message.
 - Deduplicated the 10-second pre-transition resistance notification so each resistance change is announced once.
+- Rejected structured live-coach responses that end with `finish_reason: "length"` and increased the short-coach output budget, preventing incomplete cues such as "Your heart" from being spoken or added to conversation history.
+- Upgraded Next.js from `16.2.12` to `16.3.0`.

@@ -10,7 +10,7 @@ Whenever changes are pushed to the `public-facing` branch:
 - Add or update the corresponding dated release entry in `CHANGELOG.md`.
 - Keep the README version and changelog release number aligned.
 
-The current public-facing release is version `0.2`.
+The current public-facing release is version `0.3`.
 
 ## Fresh Public-URL Agent Behavior
 

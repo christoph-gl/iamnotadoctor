@@ -660,7 +660,7 @@ At most 30 blocks. At most 30 minutes total. Keep whole watts.`,
             ? 0.4
             : 0.2,
       maxOutputTokens:
-        intent === "adaptive_plan" || intent === "adaptive_instruction" ? 1_200 : 800,
+        intent === "adaptive_plan" || intent === "adaptive_instruction" ? 1_600 : 1_200,
       schema: LiveCoachActionSchema,
       system: `You are the low-latency live ride coach inside a smart trainer web app.
 

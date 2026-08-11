@@ -474,7 +474,7 @@ function redactApiLogValue(value: unknown, depth = 0): unknown {
   if (typeof value === "object") {
     return Object.fromEntries(
       Object.entries(value as Record<string, unknown>).map(([key, item]) => {
-        if (/api[-_]?key|authorization|token|secret/i.test(key)) {
+        if (/api[-_]?key|authorization|(?:access|refresh)[-_]?token|secret/i.test(key)) {
           return [key, "[redacted]"];
         }
         if (

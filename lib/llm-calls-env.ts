@@ -171,6 +171,13 @@ export async function generateObject<T extends z.ZodTypeAny>({
       );
 
       rawText = response.choices[0]?.message?.content ?? undefined;
+      const finishReason = response.choices[0]?.finish_reason;
+      if (finishReason === "length") {
+        throw new Error("Structured response was truncated by the model output limit.");
+      }
+      if (finishReason === "content_filter") {
+        throw new Error("Structured response was blocked by the model content filter.");
+      }
       if (typeof rawText !== "string" || !rawText.trim()) {
         throw new Error("Empty structured response from model");
       }
@@ -193,7 +200,7 @@ export async function generateObject<T extends z.ZodTypeAny>({
         response: {
           rawText,
           parsed: object,
-          finishReason: response.choices[0]?.finish_reason,
+          finishReason,
           usage: response.usage,
         },
       });

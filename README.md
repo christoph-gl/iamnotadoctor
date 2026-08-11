@@ -1,6 +1,6 @@
 # iamnotadoctor
 
-> Current public-facing version: **0.2**
+> Current public-facing version: **0.3**
 
 It all started in December. I bought a smart bike ergometer (a Wahoo Kickr Core 2, to be precise), excited to get some winter miles in. At first, I was thrilled to find a nice, polished cycling app that seemingly did *not* lock everything behind a subscription model. But alas, three months later, the honeymoon phase ended. It turned out it was just a free trial, and they wanted to charge me €20/month just to control my trainer—which, let's be honest, is pretty basic technology. 
 
