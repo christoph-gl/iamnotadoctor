@@ -6,7 +6,7 @@ import { HeartRateClient } from "@/lib/hr-client";
 import { Button } from "@/components/ui/button";
 import { Cog, History, Info, Trash2 } from "lucide-react";
 import { getRiderProfile, RIDER_PROFILE, saveRiderProfile, type RiderProfile } from "@/lib/profile";
-import { WorkoutPlayer, type WorkoutPlayerHandle } from "@/components/workout-player";
+import { WorkoutPlayer, type WorkoutPlayerHandle, type PowerDisplay } from "@/components/workout-player";
 import { 
   RideSession, 
   saveRideSession, 
@@ -80,6 +80,7 @@ export default function App() {
   const [mode, setMode] = useState<TrainerMode>("erg");
   const [resistance, setResistance] = useState(20);
   const [targetPower, setTargetPower] = useState(150);
+  const [powerDisplay, setPowerDisplay] = useState<PowerDisplay>({ target: null, nextTarget: null, seconds: null });
   
   // What the trainer is currently running
   const [activeTrainerMode, setActiveTrainerMode] = useState<ActiveTrainerMode>({ type: "none" });
@@ -611,13 +612,31 @@ export default function App() {
   );
 
   return (
-    <main className="flex min-h-svh flex-col gap-6 p-6 lg:flex-row">
-      {/* Left Column - Controls & Telemetry */}
-      <div className="flex max-w-md min-w-0 flex-col gap-6 text-sm w-full">
+    <main className="grid min-h-svh content-start grid-cols-1 gap-4 p-4 sm:gap-6 sm:p-6 lg:grid-cols-[minmax(300px,1fr)_minmax(0,2fr)] lg:gap-y-0">
+      {/* Trainer controls */}
+      <div className="flex min-w-0 flex-col gap-6 text-sm w-full lg:pb-4">
         
         {/* Header with Settings */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-2xl font-bold">Workout Controller</h1>
+          <div className="flex shrink-0 items-center gap-2">
+            <Dialog open={isSessionHistoryOpen} onOpenChange={setIsSessionHistoryOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="icon" aria-label="Open session history" title={`Session History (${sessions.length})`}>
+                  <History className="h-4 w-4" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-h-[85vh] overflow-hidden rounded-md sm:max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Session History</DialogTitle>
+                  <DialogDescription>
+                    Review saved rides, export CSV files, or remove sessions.
+                  </DialogDescription>
+                </DialogHeader>
+                {renderSessionHistory()}
+              </DialogContent>
+            </Dialog>
+
           <Dialog open={isSavedSummaryOpen} onOpenChange={setIsSavedSummaryOpen}>
             <DialogContent className="sm:max-w-xl max-h-[85vh] overflow-y-auto rounded-md">
               <DialogHeader>
@@ -802,6 +821,7 @@ export default function App() {
               </div>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
         <div className="flex flex-col gap-4">
           {/* Devices Card */}
@@ -874,67 +894,90 @@ export default function App() {
           </div>
 
           <div className="flex flex-col gap-4 p-4 rounded-md border bg-card shadow-sm">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="font-semibold text-sm uppercase tracking-wider text-muted-foreground">Power</h2>
+              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                <span className={`h-2 w-2 rounded-full ${activeTrainerMode.type === "none" ? "bg-muted-foreground/40" : "bg-green-500"}`} />
+                {activeTrainerMode.type === "none" ? "Inactive" : activeTrainerMode.type === "erg" ? "ERG" : `Resistance · ${activeTrainerMode.level}%`}
+              </div>
+            </div>
+
+            <div className="flex items-end justify-between gap-4">
+              <div className="font-mono text-6xl font-bold leading-none tabular-nums">{power ?? "–"}<span className="ml-2 text-lg font-normal text-muted-foreground">W</span></div>
+              {(mode === "erg" || powerDisplay.nextTarget !== null) && (
+                <div className="text-right">
+                  <div className="text-xs font-semibold text-muted-foreground">{powerDisplay.nextTarget !== null ? `Next · in ${powerDisplay.seconds}s` : "Target"}</div>
+                  <div className={`font-mono text-3xl font-bold tabular-nums ${powerDisplay.nextTarget !== null ? powerDisplay.nextTarget > (powerDisplay.target ?? targetPower) ? "text-orange-400" : "text-blue-300" : ""}`}>
+                    {powerDisplay.nextTarget ?? (activeTrainerMode.type === "erg" ? activeTrainerMode.watts : powerDisplay.target ?? targetPower)}<span className="ml-1 text-sm font-normal">W</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Mode Switcher */}
-            <div className="flex p-0.5 bg-muted/60 rounded-md">
+            <div className="flex self-start p-0.5 bg-muted/60 rounded-md">
               <button
-                className={`flex-1 py-1 text-xs font-bold rounded transition-all ${
+                className={`px-3 py-1 text-[10px] font-bold rounded transition-all ${
                   mode === "erg" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                 }`}
                 onClick={() => setMode("erg")}
               >
-                ERG Mode (Watts)
+                ERG
               </button>
               <button
-                className={`flex-1 py-1 text-xs font-bold rounded transition-all ${
+                className={`px-3 py-1 text-[10px] font-bold rounded transition-all ${
                   mode === "resistance" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                 }`}
                 onClick={() => setMode("resistance")}
               >
-                Resistance (%)
+                Resistance
               </button>
             </div>
 
             {/* ERG Mode Controls */}
             {mode === "erg" && (
               <div className="flex flex-col gap-3 animate-in fade-in slide-in-from-bottom-1">
-                <label className="flex flex-col gap-1.5 font-medium">
-                  <div className="flex justify-between items-center text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                    <span>Target Power</span>
-                    <span className="text-primary font-mono text-sm font-bold">{targetPower} W</span>
-                  </div>
+                <div className="relative pt-5">
+                  {powerDisplay.nextTarget !== null && (
+                    <span className="pointer-events-none absolute top-0 -translate-x-1/2 whitespace-nowrap rounded bg-background px-1.5 py-0.5 font-mono text-xs font-bold text-primary" style={{ left: `${Math.max(8, Math.min(92, ((powerDisplay.nextTarget - 50) / 950) * 100))}%` }}>
+                      {powerDisplay.nextTarget} W · {powerDisplay.seconds}s
+                      <span className="absolute left-1/2 top-full h-3 w-px bg-primary" />
+                    </span>
+                  )}
                   <input
                     type="range"
                     min="50"
                     max="1000"
                     step="5"
+                    aria-label="Target power"
                     value={targetPower}
                     onChange={(e) => setTargetPower(Number(e.target.value))}
                     className="w-full accent-primary cursor-pointer h-1 bg-muted rounded-lg appearance-none"
                     disabled={connectionState !== "connected"}
                   />
-                  <div className="flex justify-between text-[10px] text-muted-foreground/50 font-semibold">
-                    <span>50 W</span>
-                    <span>1000 W</span>
-                  </div>
-                </label>
-                
+                </div>
+
                 <div className="flex gap-2 items-center">
-                  <input 
-                    type="number" 
-                    min="50" 
-                    max="1000" 
-                    value={targetPower} 
-                    onChange={(e) => setTargetPower(Number(e.target.value))}
-                    className="flex h-8 w-16 rounded-md border border-input bg-transparent px-2.5 py-1 text-xs font-mono shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                    disabled={connectionState !== "connected"}
-                  />
-                  <Button 
-                    onClick={() => applyTargetPower()} 
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="50"
+                      max="1000"
+                      aria-label="Target power in watts"
+                      value={targetPower}
+                      onChange={(e) => setTargetPower(Number(e.target.value))}
+                      className="flex h-8 w-20 rounded-md border border-input bg-transparent pl-2.5 pr-6 py-1 text-xs font-mono shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={connectionState !== "connected"}
+                    />
+                    <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground">W</span>
+                  </div>
+                  <Button
+                    onClick={() => applyTargetPower()}
                     size="sm"
-                    className="flex-1 h-8 text-xs font-semibold"
+                    className="h-8 px-3 text-xs font-semibold"
                     disabled={connectionState !== "connected"}
                   >
-                    {activeTrainerMode.type === "erg" ? "Update Target Power" : "Activate ERG Mode"}
+                    {activeTrainerMode.type === "erg" ? "Apply target" : "Activate ERG"}
                   </Button>
                 </div>
               </div>
@@ -943,71 +986,44 @@ export default function App() {
             {/* Resistance Mode Controls */}
             {mode === "resistance" && (
               <div className="flex flex-col gap-3 animate-in fade-in slide-in-from-bottom-1">
-                <label className="flex flex-col gap-1.5 font-medium">
-                  <div className="flex justify-between items-center text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                    <span>Resistance Level</span>
-                    <span className="text-primary font-mono text-sm font-bold">{resistance}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    step="0.5"
-                    value={resistance}
-                    onChange={(e) => setResistance(Number(e.target.value))}
-                    className="w-full accent-primary cursor-pointer h-1 bg-muted rounded-lg appearance-none"
-                    disabled={connectionState !== "connected"}
-                  />
-                </label>
-
-                <Button 
-                  onClick={() => applyResistance()} 
-                  size="sm"
-                  className="w-full h-8 text-xs font-semibold"
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="0.5"
+                  aria-label="Resistance level"
+                  value={resistance}
+                  onChange={(e) => setResistance(Number(e.target.value))}
+                  className="w-full accent-primary cursor-pointer h-1 bg-muted rounded-lg appearance-none"
                   disabled={connectionState !== "connected"}
-                >
-                  {activeTrainerMode.type === "resistance" ? "Update Resistance" : "Activate Resistance Mode"}
-                </Button>
-                <p className="text-[10px] text-muted-foreground/50 text-center font-medium leading-normal">
+                />
+                <div className="flex gap-2 items-center">
+                  <span className="w-20 font-mono text-sm font-bold text-primary">{resistance}%</span>
+                  <Button
+                    onClick={() => applyResistance()}
+                    size="sm"
+                    className="h-8 px-3 text-xs font-semibold"
+                    disabled={connectionState !== "connected"}
+                  >
+                    {activeTrainerMode.type === "resistance" ? "Update resistance" : "Activate resistance"}
+                  </Button>
+                </div>
+                <p className="text-[10px] text-muted-foreground/60 font-medium leading-normal">
                   Power output will scale with your cadence and gearing.
                 </p>
               </div>
             )}
           </div>
-
-          <div className="border-t pt-2">
-            <Dialog open={isSessionHistoryOpen} onOpenChange={setIsSessionHistoryOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" className="w-full justify-between">
-                  <span className="flex items-center gap-2">
-                    <History className="h-4 w-4" />
-                    Session History
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {sessions.length}
-                  </span>
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-h-[85vh] overflow-hidden rounded-md sm:max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Session History</DialogTitle>
-                  <DialogDescription>
-                    Review saved rides, export CSV files, or remove sessions.
-                  </DialogDescription>
-                </DialogHeader>
-                {renderSessionHistory()}
-              </DialogContent>
-            </Dialog>
-          </div>
         </div>
       </div>
 
       {/* Right Column - Workout Player */}
-      <div className="flex min-w-0 w-full max-w-4xl flex-col gap-6">
+      <div className="contents">
         <WorkoutPlayer
            ref={workoutPlayerRef}
            disabled={connectionState !== "connected"}
            onPowerTargetChange={applyWorkoutTargetPower}
+           onPowerDisplayChange={setPowerDisplay}
            onStopSession={handleStopSession}
            onWorkoutChange={(w) => activeWorkoutNameRef.current = w.name}
            onResistanceModeRequest={(level) => {

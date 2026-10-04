@@ -45,7 +45,14 @@ export type WorkoutPlayerHandle = {
   getRemainingWorkoutSnapshot: () => RemainingWorkoutSnapshot;
 };
 
+export type PowerDisplay = {
+  target: number | null;
+  nextTarget: number | null;
+  seconds: number | null;
+};
+
 type WorkoutPlayerProps = {
+  onPowerDisplayChange?: (display: PowerDisplay) => void;
   onPowerTargetChange: (watts: number) => void;
   onStopSession: (workoutName: string, riderComments?: string) => void;
   onWorkoutChange?: (workout: Workout) => void;
@@ -213,12 +220,12 @@ function blobToBase64(blob: Blob) {
 
 export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>(function WorkoutPlayer(
   {
+    onPowerDisplayChange,
     onPowerTargetChange,
     onStopSession,
     onWorkoutChange,
     onResistanceModeRequest,
     onRiderProfileChange,
-    manualControlMode = "erg",
     disabled,
     power,
     cadence,
@@ -277,6 +284,11 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
   const [isListeningForAdaptiveInstruction, setIsListeningForAdaptiveInstruction] = useState(false);
   const [adaptiveVoiceRecordingSeconds, setAdaptiveVoiceRecordingSeconds] = useState(0);
   const [upcomingChange, setUpcomingChange] = useState<{ nextTarget: number, currentTarget: number, seconds: number } | null>(null);
+  const nextPowerTarget = upcomingChange?.nextTarget ?? null;
+  const changeSeconds = upcomingChange?.seconds ?? null;
+  useEffect(() => {
+    onPowerDisplayChange?.({ target: currentTargetPower, nextTarget: nextPowerTarget, seconds: changeSeconds });
+  }, [onPowerDisplayChange, currentTargetPower, nextPowerTarget, changeSeconds]);
   const lastTargetRef = useRef<number | null>(null);
   const lastUpcomingNotificationKeyRef = useRef<string | null>(null);
   const fitnessResultsPresentedRef = useRef(false);
@@ -305,7 +317,6 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
   const wakeLockRef = useRef<{ release: () => Promise<void> } | null>(null);
   const adaptive = isAdaptiveFreeride(workout);
   const fitnessTest = isPowerProfileTest(workout);
-  const isResistanceWorkoutMode = manualControlMode === "resistance" || activeTrainerMode.type === "resistance";
   const workoutPlanDuration = workout.blocks.reduce((acc, b) => acc + b.durationSeconds, 0);
   const adaptiveTargetDuration = Math.max(0, Math.round(adaptiveRideIntent.durationMinutes * 60));
   const adaptiveRewriteEnabled = adaptiveRewriteIntervalMinutes !== null;
@@ -1749,9 +1760,10 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
   );
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+    <div className="contents">
+      <div className="flex min-w-0 flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-3">
           <h2 className="text-2xl font-bold">Workout Player</h2>
           <div className="flex items-center gap-2">
             <button
@@ -2035,94 +2047,44 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
             </p>
           )}
         </div>
-      )}      {/* Integrated Telemetry & Control Console */}
-      <div className="flex flex-col rounded-md border bg-card shadow-sm overflow-hidden">
+      )}
+      </div>
+      {/* Full-width telemetry uses the space beneath both dashboard columns. */}
+      <div className="flex min-w-0 flex-col rounded-md border bg-card shadow-sm overflow-hidden lg:col-span-2 lg:rounded-tr-none">
         {/* Telemetry Grid */}
-        <div className="p-4 grid grid-cols-3 gap-4 text-center divide-x divide-border/60">
-          <div className="flex flex-col items-center">
-            <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider h-8 flex flex-col items-center justify-end pb-1 gap-0.5">
-              <span>Power</span>
-              {activeTrainerMode.type === "erg" && (
-                <span className="text-[10px] text-primary normal-case font-medium leading-none">
-                  Target: {activeTrainerMode.watts}W
-                </span>
-              )}
-              {isResistanceWorkoutMode && currentTargetPower !== null && (
-                <span className="text-[10px] text-primary normal-case font-medium leading-none">
-                  Target: {currentTargetPower}W
-                </span>
-              )}
-            </span>
-            <span className="text-3xl font-bold font-mono tracking-tight mt-1">{power ?? "-"} <span className="text-sm font-normal text-muted-foreground">W</span></span>
-            {isResistanceWorkoutMode && currentTargetPower !== null && typeof power === "number" && (
-              <span className={`mt-1 text-xs font-semibold ${Math.abs(power - currentTargetPower) <= Math.max(8, currentTargetPower * 0.05) ? "text-green-400" : power > currentTargetPower ? "text-orange-400" : "text-blue-300"}`}>
-                {power > currentTargetPower ? "+" : ""}{Math.round(power - currentTargetPower)} W
-              </span>
-            )}
-            
-            <div className="h-6 w-full mt-1.5">
-              {upcomingChange && (
-                <div className="flex flex-col items-center w-full max-w-[100px] mx-auto gap-1">
-                  <div className="w-full h-1 bg-muted rounded-full overflow-hidden">
-                    <div 
-                      className={`h-full transition-all duration-1000 ease-linear ${upcomingChange.nextTarget > upcomingChange.currentTarget ? 'bg-orange-500' : 'bg-blue-400'}`} 
-                      style={{ width: `${(upcomingChange.seconds / 10) * 100}%` }}
-                    />
-                  </div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider leading-none">
-                    <span className={upcomingChange.nextTarget > upcomingChange.currentTarget ? 'text-orange-500' : 'text-blue-400'}>
-                      {upcomingChange.nextTarget > upcomingChange.currentTarget ? '▲' : '▼'} {upcomingChange.nextTarget}W
-                    </span>
-                    <span className="ml-1 opacity-70">in {upcomingChange.seconds}s</span>
-                  </span>
-                </div>
-              )}
-            </div>
+        <div className="grid grid-cols-3 gap-1 px-2 py-5 text-center divide-x divide-border/60 sm:gap-4 sm:p-6">
+          <div className="flex min-w-0 flex-col items-center">
+            <span className="flex h-8 items-end pb-1 text-xs font-bold uppercase tracking-wider text-muted-foreground">Time</span>
+            <span className="mt-2 font-mono text-[clamp(1.75rem,5vw,5rem)] leading-none font-bold tabular-nums tracking-tight">{formatTime(elapsedSeconds)}</span>
+            <span className="mt-3 font-mono text-sm text-muted-foreground sm:text-xl">/ {formatTime(totalDuration)}</span>
           </div>
-          
+
           <div className="flex flex-col items-center">
             <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider h-8 flex flex-col items-center justify-end pb-1">
               Cadence
             </span>
-            <span className="text-3xl font-bold font-mono tracking-tight mt-1">{cadence ?? "-"} <span className="text-sm font-normal text-muted-foreground">rpm</span></span>
+            <span className="mt-2 font-mono text-[clamp(2rem,6vw,6rem)] leading-none font-bold tabular-nums tracking-tight">{cadence ?? "-"} <span className="text-sm font-normal text-muted-foreground">rpm</span></span>
           </div>
 
           <div className="flex flex-col items-center">
             <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider h-8 flex flex-col items-center justify-end pb-1 gap-0.5">
               <span>HR</span>
+
+            </span>
+            <span
+              className="mt-2 font-mono text-[clamp(2rem,6vw,6rem)] leading-none font-bold tabular-nums tracking-tight"
+              style={{ color: currentHrZone?.color }}
+            >
+              {heartRate ?? "-"} <span className="text-sm font-normal opacity-75">bpm</span>
+            </span>
               {currentHrZone && (
-                <span 
-                  className="text-[10px] normal-case font-medium leading-none"
+                <span
+                  className="mt-3 text-sm sm:text-xl font-semibold tabular-nums"
                   style={{ color: currentHrZone.color }}
                 >
                   {currentHrZone.name.split(" ")[0]} ({currentHrZone.minBpm}-{currentHrZone.maxBpm})
                 </span>
               )}
-            </span>
-            <span 
-              className="text-3xl font-bold font-mono tracking-tight mt-1"
-              style={{ color: currentHrZone?.color }}
-            >
-              {heartRate ?? "-"} <span className="text-sm font-normal opacity-75">bpm</span>
-            </span>
-          </div>
-        </div>
-
-        {/* Active Mode Info Ribbon */}
-        <div className="px-4 py-2 bg-muted/40 border-t flex justify-between items-center text-xs">
-          <div className="flex items-center gap-1.5">
-            <span className="text-muted-foreground font-semibold uppercase tracking-wider">Active Mode:</span>
-            <span className="font-semibold text-foreground">
-              {activeTrainerMode.type === "none" && <span className="text-muted-foreground">None</span>}
-              {activeTrainerMode.type === "erg" && <span className="text-primary">ERG ({activeTrainerMode.watts} W)</span>}
-              {activeTrainerMode.type === "resistance" && <span className="text-primary">Resistance ({activeTrainerMode.level}%)</span>}
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-muted-foreground font-semibold uppercase tracking-wider">Time:</span>
-            <span className="font-mono font-bold text-foreground">
-              {formatTime(elapsedSeconds)} <span className="text-muted-foreground font-normal">/ {formatTime(totalDuration)}</span>
-            </span>
           </div>
         </div>
 
@@ -2159,7 +2121,7 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
         )}
 
         {/* Bottom Control Bar */}
-        <div className="px-4 py-3 bg-muted/40 border-t flex flex-wrap items-center justify-between gap-3">
+        <div className="px-4 py-3 flex flex-wrap items-center justify-between gap-3">
           {/* Left Side: Coach Settings (Inline) */}
           <div className="flex items-center gap-2">
             {!adaptive && (

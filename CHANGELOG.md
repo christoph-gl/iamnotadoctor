@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4] - 2026-10-04
+
+### Changed
+- Redesigned the dashboard layout: the Time / Cadence / HR telemetry strip now spans the full width beneath both columns, with larger, responsive readouts and the HR zone shown below the heart rate.
+- Moved live power into the Workout Controller's Power card, showing current watts next to the target, plus a "Next · in Ns" countdown before workout target changes.
+- Cleaned up the Power card: the target is shown once, the active trainer mode appears as a status badge in the card header, and the ERG and resistance controls use a compact slider and input row with an upcoming-target marker on the ERG slider.
+- Removed the separate Active Mode / Time ribbon from the player console; that information now lives in the Power card and telemetry strip.
+- Workout chart now uses the shared card background and stretches to align with the left column.
+- Upgraded Next.js to `16.3.3`, `eslint-config-next` to `16.3.3`, and Zod to `^4.5.4`.
+
 ## [0.3] - 2026-08-11
 
 ### Added

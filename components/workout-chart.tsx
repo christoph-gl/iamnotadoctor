@@ -142,8 +142,8 @@ export const WorkoutChart = memo(function WorkoutChart({
   }
 
   return (
-    <div className="w-full relative bg-[#202020] p-4 rounded-md border overflow-hidden">
-      <div className="flex justify-between items-center mb-4">
+    <div className="w-full relative flex flex-1 flex-col bg-card p-4 rounded-md border overflow-hidden lg:rounded-b-none lg:border-b-0">
+      <div className="flex flex-wrap justify-between items-center gap-3 mb-4">
         <div className="flex gap-6">
           <div className="flex flex-col">
             <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Duration</span>
@@ -170,7 +170,7 @@ export const WorkoutChart = memo(function WorkoutChart({
         </div>
       </div>
 
-      <div className="relative w-full h-[300px] select-none group">
+      <div className="relative mt-auto w-full h-[300px] shrink-0 select-none group">
         <svg 
           ref={svgRef}
           className={`w-full h-full ${onSeek ? "cursor-pointer" : ""}`}
