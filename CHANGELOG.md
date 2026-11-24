@@ -11,6 +11,10 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 - The power profile test speaks fixed, scripted instructions matched to its resistance-mode protocol (gear and cadence pacing, countdowns and "go" calls for the 5 s, 1 min, 5 min and 20 min efforts) instead of AI comments, so the timing is exact.
+- Upgraded Next.js to `16.4.5` and React to `19.3.1`, and applied `npm audit` fixes.
+
+### Security
+- Next.js `16.4.5` fixes unauthenticated remote code execution advisories in Next.js `<=16.4.0` (Image Optimization with SVG, `use cache` typed arrays). Hosted installs should update.
 
 ## [0.6] - 2026-11-01
 
