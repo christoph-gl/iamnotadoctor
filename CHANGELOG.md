@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.7] - 2026-11-24
 
 ### Added
 - Voice coach cue points: workouts can carry `coachCues`, the moments where the voice coach speaks (sparse on long Z2 rides, before efforts, halfway through long efforts and at recoveries on interval sessions). The player uses them by default; the Coach control can still switch to a fixed 1/3/5/10/15-minute interval. Workouts without cues get cues derived from their blocks.
