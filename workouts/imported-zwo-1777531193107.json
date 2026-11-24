@@ -83,5 +83,31 @@
       "durationSeconds": 60,
       "targetPower": 69
     }
+  ],
+  "coachCues": [
+    {
+      "atSeconds": 0,
+      "focus": "Ride start: 1 interval block ahead; outline the session and how to warm up."
+    },
+    {
+      "atSeconds": 285,
+      "focus": "Effort 1 of 1 starts in 15 s: 2 min around 164 W (95% FTP). Prepare the rider and give one pacing cue."
+    },
+    {
+      "atSeconds": 425,
+      "focus": "Recovery after effort 1 of 1: recover fully before the next one."
+    },
+    {
+      "atSeconds": 1144,
+      "focus": "Steady-riding check-in: comment on heart-rate drift, cadence, fueling or posture."
+    },
+    {
+      "atSeconds": 1863,
+      "focus": "Steady-riding check-in: comment on heart-rate drift, cadence, fueling or posture."
+    },
+    {
+      "atSeconds": 2581,
+      "focus": "Steady-riding check-in: comment on heart-rate drift, cadence, fueling or posture."
+    }
   ]
 }

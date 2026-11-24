@@ -18,9 +18,10 @@ import {
 } from "@/lib/rider-profile-validation";
 import type { RideSessionSummary } from "@/lib/sessions";
 import { getTrainerBridgeStatus, sendTrainerCommand, type TrainerBridgeCommandInput } from "@/lib/trainer-bridge";
+import { normalizeCoachCues, resolveCoachCues } from "@/lib/coach-cues";
 import { buildWorkout } from "@/lib/workout-builder";
 import { readWorkoutLibrary, removeWorkout, safeWorkoutId, writeWorkout } from "@/lib/workout-store";
-import { calculateWorkoutMetrics, type Workout } from "@/lib/workouts";
+import { calculateWorkoutMetrics, WORKOUTS, type CoachCue, type Workout } from "@/lib/workouts";
 
 export const dynamic = "force-dynamic";
 
@@ -122,6 +123,7 @@ function aggregate(rides: RideSessionSummary[]) {
 
 function workoutSummary(workout: Workout, ftp: number) {
   const metrics = calculateWorkoutMetrics(workout, ftp);
+  const cues = resolveCoachCues(workout, ftp);
   return {
     id: workout.id,
     name: workout.name,
@@ -131,7 +133,23 @@ function workoutSummary(workout: Workout, ftp: number) {
     trainerMode: workout.trainerMode ?? "erg",
     tss: Math.round(metrics.tss),
     intensityFactor: Number(metrics.iff.toFixed(3)),
+    coachCueCount: cues.cues.length,
+    coachCueSource: cues.source,
   };
+}
+
+function workoutDurationSeconds(blocks: Workout["blocks"]) {
+  return blocks.reduce((total, block) => total + block.durationSeconds, 0);
+}
+
+/** Validated cues, or an error message when the client sent some but none survived. */
+function cleanCues(cues: CoachCue[] | undefined, blocks: Workout["blocks"]) {
+  if (!cues) return { cues: undefined };
+  const cleaned = normalizeCoachCues(cues, workoutDurationSeconds(blocks));
+  if (cues.length > 0 && cleaned.length === 0) {
+    return { error: "No valid coach cues: each needs atSeconds and a focus or message." };
+  }
+  return { cues: cleaned.length > 0 ? cleaned : undefined };
 }
 
 const workoutBlocks = z
@@ -144,11 +162,36 @@ const workoutBlocks = z
   .min(1)
   .max(200);
 
+const coachCues = z
+  .array(
+    z.object({
+      atSeconds: z.number().int().min(0).describe("Seconds from the workout start"),
+      focus: z
+        .string()
+        .max(300)
+        .optional()
+        .describe(
+          'Brief for the in-app AI coach, which turns it into one spoken line with live telemetry, e.g. "Rep 3 of 6 starts in 15 s: 1 min at 335 W. One pacing cue."'
+        ),
+      message: z
+        .string()
+        .max(300)
+        .optional()
+        .describe("Fixed line spoken word for word without an AI call. For scripted protocols where timing must be exact."),
+    })
+  )
+  .max(120)
+  .describe(
+    "Voice coach cue points: where the coach speaks. Place them where a coach would talk: about every 15-20 min on steady Z2/endurance, ~15 s before each effort, halfway through efforts of 4 min or more, at recoveries and the cooldown. Keep them 45 s or more apart. Omit to let the app derive cues from the blocks."
+  );
+
 // Sent to every MCP client on initialize; the full operating rules are in
 // .agents/skills/iamnotadoctor-local-coach/dist/agent-skill.md.
 const MCP_INSTRUCTIONS = `iamnotadoctor is a smart-trainer cycling app. The app tab in the rider's browser owns Bluetooth, the workout player and live coaching; these tools read ride history and the rider profile, manage workouts, and relay trainer commands to that tab.
 
 Setting up a ride ("45 min endurance today"): call get_trainer_status, then build_workout with the rider's words. It saves the workout and loads it into the open tab (not started). Tell the rider the name, duration, TSS/IF and rationale. If loaded.ok is false, ask them to open the app and connect the trainer; the workout is in the library (load_workout with its id). Call start_workout only when the rider says they are ready.
+
+Voice coach cue points: every workout can carry coachCues, the moments where the in-app voice coach speaks. The app uses them by default; the rider can switch to fixed intervals (every 1-15 min) instead. When you create a workout (save_workout, load_workout with blocks) set coachCues yourself, and use set_coach_cues to add or change them on an existing workout. Place them where a coach would talk, not on a timer: sparse on long steady Z2 rides (about every 15-20 min, plus start and cooldown), dense on intervals (about 15 s before each effort, halfway through efforts of 4 min or more, the start of a recovery, the last rep of a set). For sets of short reps (under about 1 min with short rests) announce the set, check in every few minutes and call the last rep, rather than every rep. Keep cues 45 s or more apart. A cue's focus briefs the AI coach on what this moment is about; message is a fixed line spoken word for word, for scripted protocols like fitness tests. Workouts without cues get cues derived from their blocks. build_workout adds cues itself.
 
 Rules: control the trainer only when the rider asks, one request at a time, never in a loop. You cannot connect Bluetooth. Confirm with the rider before finish_ride, discard_ride, delete_ride and delete_workout, and before writing update_rider_memory. Use get_ride_stats for load questions instead of summing rides. No medical advice.`;
 
@@ -390,14 +433,17 @@ const handler = createMcpHandler(
       "get_workout",
       {
         title: "Get workout",
-        description: "Full workout definition including every ERG block.",
+        description:
+          "Full workout definition including every ERG block and its voice coach cue points (coachCueSource 'auto' means they are derived from the blocks, not stored).",
         inputSchema: z.object({ id: z.string() }),
         annotations: { readOnlyHint: true },
       },
       async ({ id }) => {
         const workout = (await readWorkoutLibrary()).find((candidate) => candidate.id === id);
         if (!workout) return fail(`Workout ${id} not found.`);
-        return json({ ...workout, ...workoutSummary(workout, getRiderProfileFromDb().fourDP.ftp) });
+        const ftp = getRiderProfileFromDb().fourDP.ftp;
+        const resolved = resolveCoachCues(workout, ftp);
+        return json({ ...workout, ...workoutSummary(workout, ftp), coachCues: resolved.cues });
       }
     );
 
@@ -436,21 +482,60 @@ const handler = createMcpHandler(
       "save_workout",
       {
         title: "Save workout",
-        description: "Save a workout to the library (creates or overwrites by id).",
+        description:
+          "Save a workout to the library (creates or overwrites by id). Include coachCues so the voice coach speaks at the moments that matter for this workout.",
         inputSchema: z.object({
           id: z.string().optional().describe("Letters, digits, - and _ only. Generated when omitted."),
           name: z.string().min(1).max(80),
           description: z.string().max(500).default(""),
           blocks: workoutBlocks,
+          coachCues: coachCues.optional(),
         }),
         annotations: { idempotentHint: true },
       },
-      async ({ id, name, description, blocks }) => {
+      async ({ id, name, description, blocks, coachCues: cues }) => {
         const workoutId = id ?? `mcp-${Date.now()}`;
         if (!safeWorkoutId(workoutId)) return fail("Invalid workout id.");
-        const workout: Workout = { id: workoutId, name, description, blocks };
+        const cleaned = cleanCues(cues, blocks);
+        if (cleaned.error) return fail(cleaned.error);
+        const workout: Workout = {
+          id: workoutId,
+          name,
+          description,
+          blocks,
+          ...(cleaned.cues ? { coachCues: cleaned.cues } : {}),
+        };
         await writeWorkout(workout);
         return json(workoutSummary(workout, getRiderProfileFromDb().fourDP.ftp));
+      }
+    );
+
+    server.registerTool(
+      "set_coach_cues",
+      {
+        title: "Set voice coach cue points",
+        description:
+          "Add, replace or clear the voice coach cue points of a saved workout. Read the workout with get_workout first to place cues on its blocks. Send an empty list to clear them (the app then derives cues from the blocks). Built-in workouts cannot be changed.",
+        inputSchema: z.object({
+          id: z.string(),
+          coachCues,
+        }),
+        annotations: { idempotentHint: true },
+      },
+      async ({ id, coachCues: cues }) => {
+        if (!safeWorkoutId(id)) return fail("Invalid workout id.");
+        if (WORKOUTS.some((builtIn) => builtIn.id === id)) {
+          return fail("Built-in workouts have their cue points in the app code and cannot be changed here.");
+        }
+        const workout = (await readWorkoutLibrary()).find((candidate) => candidate.id === id);
+        if (!workout) return fail(`Workout ${id} not found.`);
+        const cleaned = cleanCues(cues, workout.blocks);
+        if (cleaned.error) return fail(cleaned.error);
+        const updated: Workout = { ...workout, coachCues: cleaned.cues };
+        if (!updated.coachCues) delete updated.coachCues;
+        await writeWorkout(updated);
+        const ftp = getRiderProfileFromDb().fourDP.ftp;
+        return json({ ...workoutSummary(updated, ftp), coachCues: resolveCoachCues(updated, ftp).cues });
       }
     );
 
@@ -514,15 +599,24 @@ const handler = createMcpHandler(
           id: z.string().optional().describe("Library workout id"),
           name: z.string().max(80).optional().describe("Name for ad-hoc blocks"),
           blocks: workoutBlocks.optional().describe("Ad-hoc ERG blocks instead of a library id"),
+          coachCues: coachCues.optional().describe("Cue points for ad-hoc blocks"),
         }),
       },
-      async ({ id, name, blocks }) => {
+      async ({ id, name, blocks, coachCues: cues }) => {
         let workout: Workout | undefined;
         if (id) {
           workout = (await readWorkoutLibrary()).find((candidate) => candidate.id === id);
           if (!workout) return fail(`Workout ${id} not found.`);
         } else if (blocks) {
-          workout = { id: `mcp-adhoc-${Date.now()}`, name: name ?? "MCP Workout", description: "", blocks };
+          const cleaned = cleanCues(cues, blocks);
+          if (cleaned.error) return fail(cleaned.error);
+          workout = {
+            id: `mcp-adhoc-${Date.now()}`,
+            name: name ?? "MCP Workout",
+            description: "",
+            blocks,
+            ...(cleaned.cues ? { coachCues: cleaned.cues } : {}),
+          };
         } else {
           return fail("Pass either id or blocks.");
         }

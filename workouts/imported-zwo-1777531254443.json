@@ -119,5 +119,27 @@
       "durationSeconds": 120,
       "targetPower": 48
     }
+  ],
+  "coachCues": [
+    {
+      "atSeconds": 0,
+      "focus": "Ride start: 1 interval block ahead; outline the session and how to warm up."
+    },
+    {
+      "atSeconds": 713,
+      "focus": "Steady-riding check-in: comment on heart-rate drift, cadence, fueling or posture."
+    },
+    {
+      "atSeconds": 1425,
+      "focus": "Effort 1 of 1 starts in 15 s: 12 min around 219 W (127% FTP). Prepare the rider and give one pacing cue."
+    },
+    {
+      "atSeconds": 1800,
+      "focus": "Halfway through effort 1 of 1. Check form, breathing and pacing."
+    },
+    {
+      "atSeconds": 2165,
+      "focus": "Cooldown starts: wrap up the session and tell the rider to spin easy."
+    }
   ]
 }

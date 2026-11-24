@@ -83,5 +83,83 @@
       "durationSeconds": 240,
       "targetPower": 69
     }
+  ],
+  "coachCues": [
+    {
+      "atSeconds": 0,
+      "focus": "Ride start: 6 interval blocks ahead; outline the session and how to warm up."
+    },
+    {
+      "atSeconds": 285,
+      "focus": "Rep 1 of 2 of set 1 of 6 starts in 15 s: 2 min around 164 W (95% FTP). Prepare the rider and give one pacing cue."
+    },
+    {
+      "atSeconds": 465,
+      "focus": "Rep 2 of 2 of set 1 of 6 starts in 15 s: 30 s around 189 W (110% FTP). Prepare the rider and give one pacing cue."
+    },
+    {
+      "atSeconds": 515,
+      "focus": "Recovery after set 1 of 6: recover fully before the next one."
+    },
+    {
+      "atSeconds": 645,
+      "focus": "Effort 2 of 6 starts in 15 s: 8 min around 181 W (105% FTP). Prepare the rider and give one pacing cue."
+    },
+    {
+      "atSeconds": 900,
+      "focus": "Halfway through effort 2 of 6. Check form, breathing and pacing."
+    },
+    {
+      "atSeconds": 1145,
+      "focus": "Recovery after effort 2 of 6: recover fully before the next one."
+    },
+    {
+      "atSeconds": 1365,
+      "focus": "Effort 3 of 6 starts in 15 s: 8 min around 181 W (105% FTP). Prepare the rider and give one pacing cue."
+    },
+    {
+      "atSeconds": 1620,
+      "focus": "Halfway through effort 3 of 6. Check form, breathing and pacing."
+    },
+    {
+      "atSeconds": 1865,
+      "focus": "Recovery after effort 3 of 6: recover fully before the next one."
+    },
+    {
+      "atSeconds": 2085,
+      "focus": "Effort 4 of 6 starts in 15 s: 8 min around 181 W (105% FTP). Prepare the rider and give one pacing cue."
+    },
+    {
+      "atSeconds": 2340,
+      "focus": "Halfway through effort 4 of 6. Check form, breathing and pacing."
+    },
+    {
+      "atSeconds": 2585,
+      "focus": "Recovery after effort 4 of 6: recover fully before the next one."
+    },
+    {
+      "atSeconds": 2805,
+      "focus": "Effort 5 of 6 starts in 15 s: 8 min around 181 W (105% FTP). Prepare the rider and give one pacing cue."
+    },
+    {
+      "atSeconds": 3060,
+      "focus": "Halfway through effort 5 of 6. Check form, breathing and pacing."
+    },
+    {
+      "atSeconds": 3305,
+      "focus": "Recovery after effort 5 of 6: recover fully before the next one."
+    },
+    {
+      "atSeconds": 3525,
+      "focus": "Effort 6 of 6 starts in 15 s: 8 min around 181 W (105% FTP). Prepare the rider and give one pacing cue."
+    },
+    {
+      "atSeconds": 3780,
+      "focus": "Halfway through effort 6 of 6. Check form, breathing and pacing."
+    },
+    {
+      "atSeconds": 4025,
+      "focus": "Cooldown starts: wrap up the session and tell the rider to spin easy."
+    }
   ]
 }

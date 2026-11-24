@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, forwardRef, useImperativeHandle, useCallback } from "react";
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle, useCallback, useMemo } from "react";
 import {
   WORKOUTS,
   Workout,
@@ -16,7 +16,9 @@ import {
   isAdaptiveFreeride,
   spliceUpcomingBlocks,
   isPowerProfileTest,
+  type CoachCue,
 } from "@/lib/workouts";
+import { resolveCoachCues } from "@/lib/coach-cues";
 import { WorkoutChart } from "./workout-chart";
 import { Button } from "./ui/button";
 import { Mic, Trash2 } from "lucide-react";
@@ -200,6 +202,10 @@ const DEFAULT_FIXED_TRACK_COACH_INTERVAL_MINUTES = 5;
 const ADAPTIVE_REWRITE_INTERVAL_OPTIONS = [null, 1, 2, 3, 5, 10, 15] as const;
 const DEFAULT_ADAPTIVE_REWRITE_INTERVAL_MINUTES = DEFAULT_ADAPTIVE_RIDE_INTENT.feedbackIntervalMinutes;
 const LIVE_COACH_RETRY_DELAY_SECONDS = 30;
+/** A cue that could not run (coach busy) is dropped after this long. */
+const COACH_CUE_MAX_DELAY_SECONDS = 20;
+/** An AI reply arriving this soon after a scripted cue is shown but not spoken over it. */
+const SCRIPTED_CUE_SPEECH_GUARD_SECONDS = 10;
 
 function clampAdaptiveFeedbackInterval(minutes: number) {
   return Math.max(1, Math.min(15, Math.round(minutes)));
@@ -296,9 +302,8 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
   const [liveCoachFeedback, setLiveCoachFeedback] = useState<string | null>(null);
   const [liveCoachDetail, setLiveCoachDetail] = useState<string | null>(null);
   const [liveCoachStatus, setLiveCoachStatus] = useState<"idle" | "checking" | "error">("idle");
-  const [fixedTrackCoachIntervalMinutes, setFixedTrackCoachIntervalMinutes] = useState(
-    DEFAULT_FIXED_TRACK_COACH_INTERVAL_MINUTES
-  );
+  // null = speak at the workout's cue points (default); a number = every N minutes.
+  const [fixedTrackCoachIntervalMinutes, setFixedTrackCoachIntervalMinutes] = useState<number | null>(null);
   const [adaptiveRewriteIntervalMinutes, setAdaptiveRewriteIntervalMinutes] = useState<number | null>(
     DEFAULT_ADAPTIVE_REWRITE_INTERVAL_MINUTES
   );
@@ -327,6 +332,9 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
   const lastLiveCoachCheckSecondRef = useRef(0);
   const lastAdaptivePlanSecondRef = useRef(0);
   const liveCoachRetryRef = useRef<{ intent: AutomaticLiveCoachIntent; atSecond: number } | null>(null);
+  const lastCoachCueSecondRef = useRef(0);
+  const pendingCoachCueRef = useRef<CoachCue | null>(null);
+  const lastScriptedCueSecondRef = useRef<number | null>(null);
   const recentLiveCoachFeedbackRef = useRef<Array<{ role: "user" | "assistant"; text: string }>>([]);
   const rideGenerationRef = useRef(0);
   const coachSpeechRequestRef = useRef(0);
@@ -344,7 +352,13 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
   const adaptiveFeedbackIntervalSeconds = adaptiveRewriteEnabled
     ? clampAdaptiveFeedbackInterval(adaptiveRewriteIntervalMinutes) * 60
     : null;
-  const fixedTrackCoachIntervalSeconds = fixedTrackCoachIntervalMinutes * 60;
+  const coachCueMode = fixedTrackCoachIntervalMinutes === null;
+  const fixedTrackCoachIntervalSeconds =
+    (fixedTrackCoachIntervalMinutes ?? DEFAULT_FIXED_TRACK_COACH_INTERVAL_MINUTES) * 60;
+  const coachCuePlan = useMemo(
+    () => resolveCoachCues({ blocks: workout.blocks, coachCues: workout.coachCues }, riderProfile.fourDP.ftp),
+    [workout.blocks, workout.coachCues, riderProfile.fourDP.ftp]
+  );
   const totalDuration = adaptive ? adaptiveTargetDuration : workoutPlanDuration;
 
   useEffect(() => {
@@ -856,6 +870,9 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
     lastLiveCoachCheckSecondRef.current = 0;
     lastAdaptivePlanSecondRef.current = 0;
     liveCoachRetryRef.current = null;
+    lastCoachCueSecondRef.current = 0;
+    pendingCoachCueRef.current = null;
+    lastScriptedCueSecondRef.current = null;
     recentLiveCoachFeedbackRef.current = [];
     setLiveCoachStatus("idle");
     setLiveCoachFeedback(null);
@@ -1311,7 +1328,8 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
     intent: "ride_start_summary" | "periodic_ride_check" | "adaptive_plan" | "adaptive_instruction",
     riderTextOverride?: string,
     voiceAudio?: AdaptiveVoiceAudio,
-    retryOnFailure = true
+    retryOnFailure = true,
+    coachCue?: CoachCue
   ) => {
     if (liveCoachRunningRef.current) return;
     const requestRideGeneration = rideGenerationRef.current;
@@ -1355,6 +1373,7 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
               trainerMode: workout.trainerMode ?? null,
               coachInstructions: workout.coachInstructions ?? null,
             },
+            coachCue: coachCue?.focus ? { atSeconds: coachCue.atSeconds, focus: coachCue.focus } : null,
             latestSample: latestSnapshot
               ? {
                   powerW: latestSnapshot.power,
@@ -1440,8 +1459,13 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
           ...recentLiveCoachFeedbackRef.current,
           { role: "assistant" as const, text },
         ].slice(-8);
-        audioService.playCoachMessage();
-        void speakCoachText(text);
+        const scriptedAt = lastScriptedCueSecondRef.current;
+        const scriptedCueSpeaking =
+          scriptedAt !== null && elapsedSecondsRef.current - scriptedAt < SCRIPTED_CUE_SPEECH_GUARD_SECONDS;
+        if (!scriptedCueSpeaking) {
+          audioService.playCoachMessage();
+          void speakCoachText(text);
+        }
       }
       if (intent === "adaptive_instruction") {
         applyAdaptiveInstructionAction(data?.action);
@@ -1623,12 +1647,58 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
     requestLiveCoachCheck,
   ]);
 
+  // Scripted cue: spoken as written, no AI call, so its timing is exact.
+  const speakScriptedCue = useCallback(
+    (cue: CoachCue) => {
+      if (!cue.message) return;
+      lastScriptedCueSecondRef.current = elapsedSecondsRef.current;
+      setLiveCoachFeedback(cue.message);
+      setLiveCoachDetail(null);
+      recentLiveCoachFeedbackRef.current = [
+        ...recentLiveCoachFeedbackRef.current,
+        { role: "assistant" as const, text: cue.message },
+      ].slice(-8);
+      audioService.playCoachMessage();
+      void speakCoachText(cue.message);
+    },
+    [speakCoachText]
+  );
+
+  // Runs a cue: scripted ones always speak; AI-briefed ones only in cue mode.
+  // Returns false when the AI coach is busy, so the caller can retry.
+  const runCoachCue = useCallback(
+    (cue: CoachCue, intent: "ride_start_summary" | "periodic_ride_check") => {
+      if (cue.message) {
+        speakScriptedCue(cue);
+        return true;
+      }
+      if (!coachCueMode || !cue.focus) return true;
+      if (liveCoachRunningRef.current) return false;
+      lastLiveCoachCheckSecondRef.current = elapsedSecondsRef.current;
+      void requestLiveCoachCheck(intent, undefined, undefined, false, cue);
+      return true;
+    },
+    [coachCueMode, requestLiveCoachCheck, speakScriptedCue]
+  );
+
   useEffect(() => {
     if (!isPlaying) return;
 
     if (!adaptive && elapsedSeconds === 0 && !initialLiveCoachRequestedRef.current) {
       initialLiveCoachRequestedRef.current = true;
-      void requestLiveCoachCheck("ride_start_summary");
+      lastCoachCueSecondRef.current = 0;
+      const startCue = coachCuePlan.cues.find((cue) => cue.atSeconds === 0);
+      if (startCue?.message) {
+        speakScriptedCue(startCue);
+      } else {
+        void requestLiveCoachCheck(
+          "ride_start_summary",
+          undefined,
+          undefined,
+          true,
+          coachCueMode ? startCue : undefined
+        );
+      }
       return;
     }
 
@@ -1677,7 +1747,34 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
       return;
     }
 
+    // Cue points that came due since the last tick. A jump of more than a few
+    // seconds is a seek: skip the cues in between instead of firing them all.
+    const previousCueSecond = lastCoachCueSecondRef.current;
+    lastCoachCueSecondRef.current = elapsedSeconds;
+    if (elapsedSeconds > previousCueSecond && elapsedSeconds - previousCueSecond <= 3) {
+      const due = coachCuePlan.cues.filter(
+        (cue) => cue.atSeconds > previousCueSecond && cue.atSeconds <= elapsedSeconds
+      );
+      const scripted = due.filter((cue) => cue.message);
+      if (scripted.length > 0) speakScriptedCue(scripted[scripted.length - 1]);
+      const briefed = due.filter((cue) => !cue.message);
+      if (briefed.length > 0) pendingCoachCueRef.current = briefed[briefed.length - 1];
+    } else if (elapsedSeconds !== previousCueSecond) {
+      pendingCoachCueRef.current = null;
+    }
+
+    const pendingCue = pendingCoachCueRef.current;
+    if (pendingCue) {
+      if (!coachCueMode || elapsedSeconds - pendingCue.atSeconds > COACH_CUE_MAX_DELAY_SECONDS) {
+        pendingCoachCueRef.current = null;
+      } else if (runCoachCue(pendingCue, "periodic_ride_check")) {
+        pendingCoachCueRef.current = null;
+        return;
+      }
+    }
+
     if (
+      !coachCueMode &&
       elapsedSeconds >= fixedTrackCoachIntervalSeconds &&
       elapsedSeconds - lastLiveCoachCheckSecondRef.current >= fixedTrackCoachIntervalSeconds &&
       lastLiveCoachCheckSecondRef.current !== elapsedSeconds
@@ -1690,6 +1787,8 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
     adaptiveRewriteEnabled,
     adaptiveFeedbackIntervalSeconds,
     cadence,
+    coachCueMode,
+    coachCuePlan,
     currentHrZone,
     elapsedSeconds,
     fixedTrackCoachIntervalSeconds,
@@ -1698,6 +1797,8 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
     isPlaying,
     power,
     requestLiveCoachCheck,
+    runCoachCue,
+    speakScriptedCue,
   ]);
 
   useEffect(() => {
@@ -1707,6 +1808,9 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
       lastLiveCoachCheckSecondRef.current = 0;
       lastAdaptivePlanSecondRef.current = 0;
       liveCoachRetryRef.current = null;
+      lastCoachCueSecondRef.current = 0;
+      pendingCoachCueRef.current = null;
+      lastScriptedCueSecondRef.current = null;
       recentLiveCoachFeedbackRef.current = [];
       liveCoachRunningRef.current = false;
       setLiveCoachStatus("idle");
@@ -2199,6 +2303,23 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
                   Coach
                 </span>
                 <div className="flex rounded bg-muted/50 p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setFixedTrackCoachIntervalMinutes(null)}
+                    className={`h-6 min-w-8 rounded px-1.5 text-[10px] font-bold transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${
+                      coachCueMode
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                    aria-pressed={coachCueMode}
+                    title={
+                      coachCuePlan.source === "workout"
+                        ? `Coach speaks at this workout's ${coachCuePlan.cues.length} cue points`
+                        : `Coach speaks at ${coachCuePlan.cues.length} cue points derived from the intervals`
+                    }
+                  >
+                    Cues
+                  </button>
                   {FIXED_TRACK_COACH_INTERVAL_OPTIONS.map((minutes) => {
                     const selected = fixedTrackCoachIntervalMinutes === minutes;
                     return (

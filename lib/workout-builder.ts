@@ -1,6 +1,7 @@
 import { generateObject, getOpenRouterModel, openRouterApiKey, openRouterDefaultModel } from "@/lib/llm-calls-env";
 import { z } from "zod";
 import { getRiderProfileFromDb, listRideSessions } from "@/lib/db";
+import { deriveCoachCues, normalizeCoachCues } from "@/lib/coach-cues";
 import { calculateWorkoutMetrics, type Workout, type WorkoutBlock } from "@/lib/workouts";
 
 const workoutBuilderApiKey =
@@ -32,6 +33,12 @@ const WorkoutBuilderSchema = z.object({
     .min(1)
     // Checked after parsing, not sent as maxItems: Gemini rejects that keyword with a 400.
     .refine((blocks) => blocks.length <= 80, "Use at most 80 blocks"),
+  coachCues: z.array(
+    z.object({
+      atSeconds: z.number(),
+      focus: z.string().max(300),
+    })
+  ),
 });
 
 function compactSession(session: ReturnType<typeof listRideSessions>[number]) {
@@ -145,6 +152,7 @@ Task:
 - Use the last 5 ride evaluations, dates, and current date/time to avoid stacking inappropriate intensity.
 - Prefer endurance/recovery when the request says endurance, easy, aerobic, or when recent ride summaries show high HR strain.
 - Output ERG blocks only: durationSeconds and targetPower.
+- Also output coachCues: the moments the in-app voice coach speaks, as atSeconds from the workout start plus a short focus that briefs the coach (what is happening, what to emphasize).
 
 Rules:
 - Respect requested duration if provided. If vague, choose 30-60 minutes.
@@ -153,6 +161,13 @@ Rules:
 - Use P300/P60/P5-style efforts sparingly and only when requested or sensible from recent context.
 - Do not prescribe medical advice.
 - The final workout should be practical to ride indoors today.
+
+Coach cue rules:
+- Always one cue at 0 (ride start).
+- Long steady/Z2 riding: few cues, about every 15-20 minutes (heart-rate drift, cadence, fueling, posture).
+- Intervals: about 15 s before each effort (name it, e.g. "Rep 3 of 6 starts in 15 s: 1 min at 335 W"), halfway through efforts of 4 min or more, at the start of longer recoveries and of the cooldown.
+- Sets of short reps (under about 1 min with short rests): announce the set, check in every few minutes and call the last rep instead of cueing every rep.
+- Keep cues at least 45 s apart.
 
 Planning payload:
 ${JSON.stringify(payload, null, 2)}`,
@@ -164,11 +179,14 @@ ${JSON.stringify(payload, null, 2)}`,
   const blocks = mergeAdjacentBlocks(
     result.object.blocks.map((block) => clampBlock(block, riderProfile.fourDP.map))
   );
+  const durationSeconds = blocks.reduce((total, block) => total + block.durationSeconds, 0);
+  const modelCues = normalizeCoachCues(result.object.coachCues, durationSeconds);
   const workout: Workout = {
     id: `ai-built-${Date.now()}`,
     name: result.object.name,
     description: result.object.description,
     blocks,
+    coachCues: modelCues.length > 0 ? modelCues : deriveCoachCues(blocks, riderProfile.fourDP.ftp),
   };
   const metrics = calculateWorkoutMetrics(workout, riderProfile.fourDP.ftp);
 
