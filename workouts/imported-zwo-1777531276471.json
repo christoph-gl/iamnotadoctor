@@ -127,5 +127,83 @@
       "durationSeconds": 240,
       "targetPower": 86
     }
+  ],
+  "coachCues": [
+    {
+      "atSeconds": 0,
+      "focus": "Ride start: 3 interval blocks ahead; outline the session and how to warm up."
+    },
+    {
+      "atSeconds": 225,
+      "focus": "Rep 1 of 5 of set 1 of 3 starts in 15 s: 2 min around 181 W (105% FTP). Prepare the rider and give one pacing cue."
+    },
+    {
+      "atSeconds": 405,
+      "focus": "Rep 2 of 5 of set 1 of 3 starts in 15 s: 2 min around 181 W (105% FTP). Prepare the rider and give one pacing cue."
+    },
+    {
+      "atSeconds": 585,
+      "focus": "Rep 3 of 5 of set 1 of 3 starts in 15 s: 2 min around 181 W (105% FTP). Prepare the rider and give one pacing cue."
+    },
+    {
+      "atSeconds": 765,
+      "focus": "Rep 4 of 5 of set 1 of 3 starts in 15 s: 2 min around 181 W (105% FTP). Prepare the rider and give one pacing cue."
+    },
+    {
+      "atSeconds": 945,
+      "focus": "Rep 5 of 5 of set 1 of 3 starts in 15 s: 2 min around 181 W (105% FTP). Prepare the rider and give one pacing cue."
+    },
+    {
+      "atSeconds": 1085,
+      "focus": "Recovery after set 1 of 3: recover fully before the next one."
+    },
+    {
+      "atSeconds": 1365,
+      "focus": "Rep 1 of 5 of set 2 of 3 starts in 15 s: 2 min around 181 W (105% FTP). Prepare the rider and give one pacing cue."
+    },
+    {
+      "atSeconds": 1545,
+      "focus": "Rep 2 of 5 of set 2 of 3 starts in 15 s: 2 min around 181 W (105% FTP). Prepare the rider and give one pacing cue."
+    },
+    {
+      "atSeconds": 1725,
+      "focus": "Rep 3 of 5 of set 2 of 3 starts in 15 s: 2 min around 181 W (105% FTP). Prepare the rider and give one pacing cue."
+    },
+    {
+      "atSeconds": 1905,
+      "focus": "Rep 4 of 5 of set 2 of 3 starts in 15 s: 2 min around 181 W (105% FTP). Prepare the rider and give one pacing cue."
+    },
+    {
+      "atSeconds": 2085,
+      "focus": "Rep 5 of 5 of set 2 of 3 starts in 15 s: 2 min around 181 W (105% FTP). Prepare the rider and give one pacing cue."
+    },
+    {
+      "atSeconds": 2225,
+      "focus": "Recovery after set 2 of 3: recover fully before the next one."
+    },
+    {
+      "atSeconds": 2505,
+      "focus": "Rep 1 of 5 of set 3 of 3 starts in 15 s: 2 min around 181 W (105% FTP). Prepare the rider and give one pacing cue."
+    },
+    {
+      "atSeconds": 2685,
+      "focus": "Rep 2 of 5 of set 3 of 3 starts in 15 s: 2 min around 181 W (105% FTP). Prepare the rider and give one pacing cue."
+    },
+    {
+      "atSeconds": 2865,
+      "focus": "Rep 3 of 5 of set 3 of 3 starts in 15 s: 2 min around 181 W (105% FTP). Prepare the rider and give one pacing cue."
+    },
+    {
+      "atSeconds": 3045,
+      "focus": "Rep 4 of 5 of set 3 of 3 starts in 15 s: 2 min around 181 W (105% FTP). Prepare the rider and give one pacing cue."
+    },
+    {
+      "atSeconds": 3225,
+      "focus": "Rep 5 of 5 of set 3 of 3 starts in 15 s: 2 min around 181 W (105% FTP). Prepare the rider and give one pacing cue."
+    },
+    {
+      "atSeconds": 3365,
+      "focus": "Cooldown starts: wrap up the session and tell the rider to spin easy."
+    }
   ]
 }

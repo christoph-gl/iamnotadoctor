@@ -1,5 +1,5 @@
 ---
-iamnotadoctor-skill-version: 10
+iamnotadoctor-skill-version: 11
 name: iamnotadoctor-local-fitness-tracker
 description: Help a rider use their iamnotadoctor cycling app from an agent - ride history and stats, in-app LLM ride summaries, rider profile and memory, workouts, and trainer control on request. Uses the app's MCP server (or HTTP), locally or on the rider's own domain.
 ---
@@ -35,7 +35,7 @@ Put numeric age in `age`, explicitly given weight/gender/cTHR/4DP in their field
 | Rider | `get_rider_profile`, `update_rider_profile`, `update_rider_memory` |
 | Ride history | `list_rides` (date range, workout name, paging), `get_ride` (full LLM evaluation, optional downsampled samples), `get_ride_stats` (totals, optionally per week or month), `delete_ride` |
 | Rollups | `list_monthly_summaries`, `generate_monthly_summary` |
-| Workouts | `list_workouts`, `get_workout`, `build_workout` (AI build like the app's Build button; saves to the library and loads it into the open tab by default, `save`/`load` to opt out), `save_workout`, `delete_workout` |
+| Workouts | `list_workouts`, `get_workout`, `build_workout` (AI build like the app's Build button; saves to the library and loads it into the open tab by default, `save`/`load` to opt out), `save_workout`, `set_coach_cues` (voice coach cue points of a saved workout), `delete_workout` |
 | Trainer | `get_trainer_status`, `set_erg_power`, `set_resistance`, `load_workout`, `start_workout`, `pause_workout`, `seek_workout`, `finish_ride`, `discard_ride` |
 
 ## HTTP Fallback
@@ -65,6 +65,24 @@ When the rider asks for a workout for today ("45 min endurance, legs are tired")
 4. Call `start_workout` only when the rider says they are ready.
 
 To use a workout the rider describes exactly (fixed blocks), use `save_workout` or `load_workout` with `blocks` instead of the AI builder.
+
+### Voice coach cue points
+
+Every workout can carry `coachCues`: the moments where the in-app voice coach speaks. The app uses them by default; the rider can switch the player to fixed intervals (every 1, 3, 5, 10 or 15 min) instead. `build_workout` adds cues itself. When you write blocks yourself (`save_workout`, `load_workout`), also send `coachCues`; to add or change cues on an existing saved workout, read it with `get_workout` and call `set_coach_cues`.
+
+Each cue is `{ atSeconds, focus }` or `{ atSeconds, message }`:
+
+- `focus` briefs the in-app AI coach on what this moment is about; it turns that into one spoken line using live telemetry. Example: `"Rep 3 of 6 starts in 15 s: 1 min at 335 W. One pacing cue."`
+- `message` is a fixed line spoken word for word without an AI call, for scripted protocols where timing must be exact (the built-in power profile test uses these).
+
+Place cues where a coach would talk, not on a timer:
+
+- Long steady or Z2 rides: few cues, about every 15-20 min, plus ride start and cooldown.
+- Intervals: about 15 s before each effort, halfway through efforts of 4 min or more, at the start of longer recoveries, at the cooldown.
+- Sets of short reps (under about 1 min with short rests): announce the set, check in every few minutes and call the last rep instead of cueing every rep.
+- Always one cue at 0; keep cues at least 45 s apart.
+
+Workouts without cues get cues derived from their blocks, so cues are an improvement, not a requirement.
 
 ## Trainer Control
 

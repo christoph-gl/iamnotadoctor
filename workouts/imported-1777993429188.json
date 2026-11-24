@@ -199,5 +199,35 @@
       "durationSeconds": 305,
       "targetPower": 86
     }
+  ],
+  "coachCues": [
+    {
+      "atSeconds": 0,
+      "focus": "Ride start: 1 interval block ahead; outline the session and how to warm up."
+    },
+    {
+      "atSeconds": 255,
+      "focus": "Set 1 of 1 starts in 15 s: 22 reps, the first 50 s around 201 W (117% FTP), about 1 min easy between. Explain the set and how to pace it."
+    },
+    {
+      "atSeconds": 603,
+      "focus": "Rep 5 of 22: 30 s around 258 W (150% FTP). Encourage and check form."
+    },
+    {
+      "atSeconds": 903,
+      "focus": "Rep 10 of 22: 30 s around 194 W (113% FTP). Encourage and check form."
+    },
+    {
+      "atSeconds": 1293,
+      "focus": "Rep 14 of 22: 30 s around 184 W (107% FTP). Encourage and check form."
+    },
+    {
+      "atSeconds": 1593,
+      "focus": "Rep 19 of 22: 30 s around 249 W (145% FTP). Encourage and check form."
+    },
+    {
+      "atSeconds": 1770,
+      "focus": "Last rep starts in 15 s: 15 s around 310 W (180% FTP). Finish the set strong."
+    }
   ]
 }

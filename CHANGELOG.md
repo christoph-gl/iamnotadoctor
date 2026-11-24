@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7] - 2026-11-24
+
+### Added
+- Voice coach cue points: workouts can carry `coachCues`, the moments where the voice coach speaks (sparse on long Z2 rides, before efforts, halfway through long efforts and at recoveries on interval sessions). The player uses them by default; the Coach control can still switch to a fixed 1/3/5/10/15-minute interval. Workouts without cues get cues derived from their blocks.
+- MCP: `save_workout` and `load_workout` accept `coachCues`, the new `set_coach_cues` tool changes them on a saved workout, `list_workouts`/`get_workout` report them, and the initialize instructions tell agents how to place them. `build_workout` now asks the model for cue points too. Agent skill version 11.
+- `scripts/backfill-coach-cues.mjs` adds derived cue points to saved workouts that have none. The workouts in `workouts/` and the built-in workouts now have cue points.
+
+### Changed
+- The power profile test speaks fixed, scripted instructions matched to its resistance-mode protocol (gear and cadence pacing, countdowns and "go" calls for the 5 s, 1 min, 5 min and 20 min efforts) instead of AI comments, so the timing is exact.
+
 ## [0.6] - 2026-11-01
 
 ### Changed

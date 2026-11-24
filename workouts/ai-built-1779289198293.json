@@ -31,5 +31,23 @@
       "durationSeconds": 180,
       "targetPower": 86
     }
+  ],
+  "coachCues": [
+    {
+      "atSeconds": 0,
+      "focus": "Ride start: 2 interval blocks ahead; outline the session and how to warm up."
+    },
+    {
+      "atSeconds": 585,
+      "focus": "Effort 1 of 2 starts in 15 s: 1 min around 172 W (100% FTP). Prepare the rider and give one pacing cue."
+    },
+    {
+      "atSeconds": 825,
+      "focus": "Effort 2 of 2 starts in 15 s: 1 min around 172 W (100% FTP). Prepare the rider and give one pacing cue."
+    },
+    {
+      "atSeconds": 905,
+      "focus": "Cooldown starts: wrap up the session and tell the rider to spin easy."
+    }
   ]
 }

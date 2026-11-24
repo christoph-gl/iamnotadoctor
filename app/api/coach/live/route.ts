@@ -415,6 +415,7 @@ function compactSnapshot(value: unknown) {
   const rolling = getRecord(snapshot.rolling);
   const adaptiveRideIntent = getRecord(snapshot.adaptiveRideIntent);
   const workoutContext = getRecord(snapshot.workoutContext);
+  const coachCue = getRecord(snapshot.coachCue);
   const rollingSnapshots = Array.isArray(rolling?.snapshots)
     ? rolling.snapshots
         .slice(-20)
@@ -457,6 +458,12 @@ function compactSnapshot(value: unknown) {
           kind: compactString(workoutContext.kind, 40),
           trainerMode: compactString(workoutContext.trainerMode, 40),
           coachInstructions: compactString(workoutContext.coachInstructions, 1_200),
+        }
+      : null,
+    coachCue: coachCue
+      ? {
+          atSeconds: compactNumber(coachCue.atSeconds),
+          focus: compactString(coachCue.focus, 300),
         }
       : null,
     latestSample: latestSample
@@ -682,6 +689,7 @@ Do not use send_message when the rider clearly asks to change watts or resistanc
 For coach_check without a specific rider request, prefer one concise rider-facing comment unless telemetry clearly calls for ERG or resistance adjustment.
 For ride_start_summary during a preplanned workout, return send_message only and set speak true. Give a coach-like opening in exactly 2 short sentences: name the workout and target-power pattern, then give one thing to watch for early. Do not merely welcome the rider. Do not return set_workout_plan, set_erg_watts, or set_resistance for ride_start_summary.
 For periodic_ride_check during a preplanned workout, return send_message only and set speak true. Use rider profile, heart-rate zones, rolling snapshots, ride-so-far averages, and remainingWorkout to give one coach-like comment about how the ride is going and what to focus on next. Rotate focus across power, cadence, heart-rate trend, workout progress, the next block, breathing, posture, fueling, and pacing. Do not repeat the topic or phrasing from conversationHistory. Do not return set_workout_plan, set_erg_watts, or set_resistance for periodic_ride_check.
+When snapshot.coachCue is present, this check was triggered by a cue point the workout's author placed at this moment. Make the comment about coachCue.focus (for example the effort that is about to start, a halfway check, or the recovery), timed for right now, and add live telemetry only where it helps. Keep it short enough to finish speaking before the moment it announces.
 When snapshot.workoutContext.coachInstructions is present, treat it as the protocol-specific coaching brief. Follow it closely for ride_start_summary and periodic_ride_check. For a fitness test in resistance mode, do not coach the rider to hold the chart target watts and do not request trainer-load changes.
 When rider text is included, treat it as the latest chat message from the rider.
 Use set_workout_plan for requests that mention the workout, track, plan, remaining work, rest of workout, next N minutes, compressing duration, stretching duration, or scaling effort over time.

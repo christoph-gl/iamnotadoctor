@@ -5,6 +5,19 @@ export type WorkoutBlock = {
   targetPower: number;
 };
 
+/**
+ * A point in the workout where the voice coach speaks.
+ * - focus: a brief for the AI coach, which writes and speaks one line about it
+ *   using live telemetry (e.g. "Effort 3 of 6 starts in 15 s: 1 min at 335 W").
+ * - message: a fixed line spoken as written, without an AI call. Use it for
+ *   scripted protocols such as fitness tests, where timing must be exact.
+ */
+export type CoachCue = {
+  atSeconds: number;
+  focus?: string;
+  message?: string;
+};
+
 export type Workout = {
   id: string;
   name: string;
@@ -14,6 +27,8 @@ export type Workout = {
   trainerMode?: "erg" | "resistance";
   resistanceLevel?: number;
   coachInstructions?: string;
+  /** Custom voice coach cue points. Without them the app derives cues from the blocks. */
+  coachCues?: CoachCue[];
 };
 
 export type LLMWorkoutBlock = {
@@ -252,6 +267,48 @@ export function isPowerProfileTest(workout: Workout) {
   return workout.id === POWER_PROFILE_TEST_ID || workout.kind === "fitness-test";
 }
 
+const m = (minutes: number, seconds = 0) => minutes * 60 + seconds;
+
+// Scripted lines for the power profile test. The trainer stays in resistance
+// mode, so the rider sets power with gears and cadence; the measured windows
+// are 20:00 (5 s), 25:00 (1 min), 34:00 (5 min) and 49:00 (20 min), see
+// lib/power-profile-test.ts. "Go" cues come 2 s early to cover speech latency.
+const POWER_PROFILE_TEST_CUES: CoachCue[] = [
+  { atSeconds: 0, message: "Power profile test. The trainer stays in resistance mode, so you set the power with your gears and cadence, not the chart. Start easy and build gradually over the next 15 minutes." },
+  { atSeconds: m(5), message: "Keep building gently. Shift up one gear or raise your cadence a little each minute. You should still be able to talk." },
+  { atSeconds: m(10), message: "Warm-up is two thirds done. Stay relaxed around 90 rpm and breathe calmly." },
+  { atSeconds: m(15), message: "Warm-up done. Five easy minutes to get ready. Drink now, and pick your sprint gear: heavy, but one you can still spin up fast." },
+  { atSeconds: m(19, 30), message: "Sprint in 30 seconds. Shift into your sprint gear and let the cadence drop so you can jump on it." },
+  { atSeconds: m(19, 48), message: "10 seconds. Hands on the drops, get ready." },
+  { atSeconds: m(19, 58), message: "Go! All out for 5 seconds!" },
+  { atSeconds: m(20, 6), message: "Stop. Shift down and spin easy. Next is the 1-minute effort at 25 minutes." },
+  { atSeconds: m(24), message: "One-minute effort in one minute. Pick a gear you can push very hard for a full minute." },
+  { atSeconds: m(24, 45), message: "15 seconds. Start hard, but do not sprint the first seconds." },
+  { atSeconds: m(24, 58), message: "Go! One minute, as hard as you can hold." },
+  { atSeconds: m(25, 30), message: "Halfway. Hold it, keep the cadence up." },
+  { atSeconds: m(25, 48), message: "10 seconds. Empty the tank." },
+  { atSeconds: m(26, 2), message: "Done. Shift down and spin easy. Eight minutes of recovery." },
+  { atSeconds: m(30), message: "Keep recovering. The 5-minute effort starts at 34 minutes. Drink and breathe." },
+  { atSeconds: m(33), message: "Five-minute effort in one minute. Choose a gear and cadence you can hold for five minutes. Even pacing, no sprint start." },
+  { atSeconds: m(33, 45), message: "15 seconds. Settle in for a steady start." },
+  { atSeconds: m(33, 58), message: "Go! Five minutes, hard but even." },
+  { atSeconds: m(35), message: "One minute done. Keep it steady and do not fade." },
+  { atSeconds: m(36, 30), message: "Halfway. Hold your gear and cadence." },
+  { atSeconds: m(38), message: "One minute to go. Lift it if you have anything left." },
+  { atSeconds: m(38, 48), message: "10 seconds. Finish strong." },
+  { atSeconds: m(39, 2), message: "Done. Easy spinning now, ten minutes of recovery before the 20-minute effort." },
+  { atSeconds: m(44), message: "Five more minutes of recovery. Drink and stay loose. The 20-minute effort sets your FTP, so plan a pace you can hold the whole way." },
+  { atSeconds: m(48), message: "20-minute effort in one minute. Pick a gear you can hold for all 20 minutes, and start a little conservative." },
+  { atSeconds: m(48, 58), message: "Go! 20 minutes, steady and controlled." },
+  { atSeconds: m(54), message: "Five minutes in. Breathing should be hard but controlled. Hold the same gear and cadence." },
+  { atSeconds: m(59), message: "Halfway. If you feel good, hold this pace. No surges." },
+  { atSeconds: m(64), message: "Five minutes left. Start lifting gradually if you can." },
+  { atSeconds: m(67), message: "Two minutes to go. Give what you have left." },
+  { atSeconds: m(68, 30), message: "30 seconds. Empty the tank." },
+  { atSeconds: m(69, 2), message: "Test done. Shift down and spin easy for the cooldown. Your results are ready on screen." },
+  { atSeconds: m(74), message: "Keep it easy. Five minutes of cooldown left." },
+];
+
 const POWER_PROFILE_TEST: Workout = {
   id: POWER_PROFILE_TEST_ID,
   name: "Power Profile Test",
@@ -262,6 +319,7 @@ const POWER_PROFILE_TEST: Workout = {
   resistanceLevel: 20,
   coachInstructions:
     "This is a maximal power-profile assessment, not a normal ERG workout. The trainer is in resistance mode. Coach the rider through the protocol: progressive warm-up, easy preparation, all-out 5-second NM sprint at 20:00, maximal sustainable 1-minute AC effort at 25:00, maximal sustainable 5-minute MAP effort at 34:00, and best sustainable 20-minute FTP effort at 49:00. During recovery, prioritize actual recovery. Before each test effort, explain pacing and timing briefly. Never tell the rider to match the chart watts; the measured power determines the result.",
+  coachCues: POWER_PROFILE_TEST_CUES,
   blocks: [
     ...Array.from({ length: 15 }, (_, index) => ({
       durationSeconds: 60,
@@ -334,6 +392,18 @@ export const WORKOUTS: Workout[] = [
     id: "the-shovel-simulated",
     name: "The Shovel (Simulated)",
     description: "A challenging set of Anaerobic Capacity efforts mimicking your profile screenshot.",
+    coachCues: [
+      { atSeconds: 0, focus: "Ride start: six 1-minute AC efforts after a warm-up and primer; outline the session and how to warm up." },
+      { atSeconds: m(6, 45), focus: "One minute at FTP (172 W) starts in 15 s, the last warm-up step. Smooth and steady." },
+      { atSeconds: m(9, 45), focus: "Primer in 15 s: 30 s at MAP then 30 s at AC to open the legs. Not a full effort." },
+      { atSeconds: m(13, 45), focus: "AC effort 1 of 6 starts in 15 s: 1 min at 335 W. Explain how to pace a 1-minute effort without fading." },
+      { atSeconds: m(16, 45), focus: "AC effort 2 of 6 starts in 15 s: 1 min at 335 W. One pacing cue." },
+      { atSeconds: m(19, 45), focus: "AC effort 3 of 6 starts in 15 s: 1 min at 335 W. Halfway through the set; check how recovery is going." },
+      { atSeconds: m(22, 45), focus: "AC effort 4 of 6 starts in 15 s: 1 min at 335 W. Focus on form when it hurts." },
+      { atSeconds: m(25, 45), focus: "AC effort 5 of 6 starts in 15 s: 1 min at 335 W. Keep the cadence high." },
+      { atSeconds: m(28, 45), focus: "Last AC effort, 6 of 6, starts in 15 s: 1 min at 335 W. Finish strong." },
+      { atSeconds: m(30, 5), focus: "Cooldown starts: wrap up the session and tell the rider to spin easy." },
+    ],
     blocks: [
       // Warmup
       { durationSeconds: 300, targetPower: 110 },
@@ -360,6 +430,18 @@ export const WORKOUTS: Workout[] = [
     id: "sweet-spot-3x10",
     name: "Sweet Spot 3x10",
     description: "Build muscular endurance with 3x 10-minute intervals just below threshold.",
+    coachCues: [
+      { atSeconds: 0, focus: "Ride start: three 10-minute sweet spot intervals at 160 W; outline the session and the warm-up." },
+      { atSeconds: m(9, 45), focus: "Interval 1 of 3 starts in 15 s: 10 min at 160 W. Settle into a steady cadence and controlled breathing." },
+      { atSeconds: m(15), focus: "Halfway through interval 1 of 3. Check posture and cadence." },
+      { atSeconds: m(20, 5), focus: "Recovery after interval 1 of 3: three easy minutes, drink." },
+      { atSeconds: m(22, 45), focus: "Interval 2 of 3 starts in 15 s: 10 min at 160 W. Same pacing as the first." },
+      { atSeconds: m(28), focus: "Halfway through interval 2 of 3. Comment on heart-rate drift compared with interval 1." },
+      { atSeconds: m(33, 5), focus: "Recovery after interval 2 of 3: three easy minutes, drink." },
+      { atSeconds: m(35, 45), focus: "Interval 3 of 3 starts in 15 s: 10 min at 160 W. Last one, stay steady." },
+      { atSeconds: m(41), focus: "Halfway through the last interval. Encourage and keep form." },
+      { atSeconds: m(46, 5), focus: "Cooldown starts: wrap up the session and tell the rider to spin easy." },
+    ],
     blocks: [
       { durationSeconds: 300, targetPower: 100 },
       { durationSeconds: 300, targetPower: 130 },

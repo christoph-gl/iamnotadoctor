@@ -87,5 +87,43 @@
       "durationSeconds": 180,
       "targetPower": 86
     }
+  ],
+  "coachCues": [
+    {
+      "atSeconds": 0,
+      "focus": "Ride start: 8 interval blocks ahead; outline the session and how to warm up."
+    },
+    {
+      "atSeconds": 405,
+      "focus": "Effort 1 of 8 starts in 15 s: 1 min around 172 W (100% FTP). Prepare the rider and give one pacing cue."
+    },
+    {
+      "atSeconds": 585,
+      "focus": "Effort 2 of 8 starts in 15 s: 30 s around 578 W (336% FTP). Prepare the rider and give one pacing cue."
+    },
+    {
+      "atSeconds": 815,
+      "focus": "Effort 3 of 8 starts in 15 s: 15 s around 821 W (477% FTP). Prepare the rider and give one pacing cue."
+    },
+    {
+      "atSeconds": 1030,
+      "focus": "Effort 4 of 8 starts in 15 s: 15 s around 821 W (477% FTP). Prepare the rider and give one pacing cue."
+    },
+    {
+      "atSeconds": 1245,
+      "focus": "Effort 5 of 8 starts in 15 s: 15 s around 821 W (477% FTP). Prepare the rider and give one pacing cue."
+    },
+    {
+      "atSeconds": 1460,
+      "focus": "Effort 6 of 8 starts in 15 s: 15 s around 821 W (477% FTP). Prepare the rider and give one pacing cue."
+    },
+    {
+      "atSeconds": 1675,
+      "focus": "Effort 7 of 8 starts in 15 s: 15 s around 821 W (477% FTP). Prepare the rider and give one pacing cue."
+    },
+    {
+      "atSeconds": 1890,
+      "focus": "Effort 8 of 8 starts in 15 s: 15 s around 821 W (477% FTP). Prepare the rider and give one pacing cue."
+    }
   ]
 }

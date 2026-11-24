@@ -15,5 +15,15 @@
       "durationSeconds": 300,
       "targetPower": 77
     }
+  ],
+  "coachCues": [
+    {
+      "atSeconds": 0,
+      "focus": "Ride start: steady ride; outline the session and the effort level to hold."
+    },
+    {
+      "atSeconds": 750,
+      "focus": "Steady-riding check-in: comment on heart-rate drift, cadence, fueling or posture."
+    }
   ]
 }

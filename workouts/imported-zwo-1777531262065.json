@@ -195,5 +195,43 @@
       "durationSeconds": 180,
       "targetPower": 139
     }
+  ],
+  "coachCues": [
+    {
+      "atSeconds": 0,
+      "focus": "Ride start: 2 interval blocks ahead; outline the session and how to warm up."
+    },
+    {
+      "atSeconds": 585,
+      "focus": "Set 1 of 2 starts in 15 s: 8 reps, the first 45 s around 277 W (161% FTP), about 1 min easy between. Explain the set and how to pace it."
+    },
+    {
+      "atSeconds": 918,
+      "focus": "Rep 4 of 8 of set 1 of 2: 45 s around 277 W (161% FTP). Encourage and check form."
+    },
+    {
+      "atSeconds": 1320,
+      "focus": "Last rep of set 1 of 2 starts in 15 s: 45 s around 277 W (161% FTP). Finish the set strong."
+    },
+    {
+      "atSeconds": 1385,
+      "focus": "Recovery after set 1 of 2: recover fully before the next one."
+    },
+    {
+      "atSeconds": 2145,
+      "focus": "Set 2 of 2 starts in 15 s: 8 reps, the first 45 s around 277 W (161% FTP), about 1 min easy between. Explain the set and how to pace it."
+    },
+    {
+      "atSeconds": 2478,
+      "focus": "Rep 4 of 8 of set 2 of 2: 45 s around 277 W (161% FTP). Encourage and check form."
+    },
+    {
+      "atSeconds": 2880,
+      "focus": "Last rep of set 2 of 2 starts in 15 s: 45 s around 277 W (161% FTP). Finish the set strong."
+    },
+    {
+      "atSeconds": 2945,
+      "focus": "Cooldown starts: wrap up the session and tell the rider to spin easy."
+    }
   ]
 }

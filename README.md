@@ -1,6 +1,6 @@
 # iamnotadoctor
 
-> Current public-facing version: **0.6**
+> Current public-facing version: **0.7**
 
 It all started in December. I bought a smart bike ergometer (a Wahoo Kickr Core 2, to be precise), excited to get some winter miles in. At first, I was thrilled to find a nice, polished cycling app that seemingly did *not* lock everything behind a subscription model. But alas, three months later, the honeymoon phase ended. It turned out it was just a free trial, and they wanted to charge me €20/month just to control my trainer—which, let's be honest, is pretty basic technology. 
 
@@ -167,7 +167,9 @@ If you are not using Portless, replace `https://iamnotadoctor.localhost` with `h
 The workout player uses `POST /api/coach/live` for app-owned, low-latency feedback during structured workouts:
 
 - **At ride start:** when the rider presses Play at `0:00`, the browser sends `intent: "ride_start_summary"`. The payload includes the rider profile and the remaining workout blocks. The model returns a short `send_message` that summarizes the planned ride and gives one focus cue.
-- **Every five minutes:** while the workout is playing, the browser sends `intent: "periodic_ride_check"`. The payload includes the rider profile, HR zones, active mode, the latest sample, ride-so-far averages, rolling 30-second snapshots from the last 10 minutes, and the remaining workout blocks.
+- **At the workout's cue points (default):** a workout can carry `coachCues`, the moments where the coach speaks: sparse on long Z2 rides, before each effort and at recoveries on interval sessions. At each cue the browser sends `intent: "periodic_ride_check"` with `snapshot.coachCue.focus` describing the moment. The payload includes the rider profile, HR zones, active mode, the latest sample, ride-so-far averages, rolling 30-second snapshots from the last 10 minutes, and the remaining workout blocks. Workouts without cues get cues derived from their blocks (`lib/coach-cues.ts`). A cue with a `message` instead of a `focus` is spoken as written without an AI call; the power profile test uses these for its resistance-mode protocol.
+- **Fixed intervals (optional):** the Coach control under the player switches from **Cues** to a check every 1, 3, 5, 10 or 15 minutes. Scripted `message` cues still play.
+- **Adding cues to saved workouts:** agents use the MCP `set_coach_cues` tool; `node scripts/backfill-coach-cues.mjs` adds derived cues to every saved workout in `workouts/` that has none.
 - **Feedback-only for preplanned workouts:** the prompt tells the model to return `send_message` only for these two intents, and the client does not apply trainer or workout commands from periodic checks. Planned ERG targets remain owned by the workout timeline.
 
 The feedback is rendered below the Power/Cadence/HR card. General live-coach calls use `LIVE_COACH_TIMEOUT_MS` (8000 ms by default), while automatic fixed-track summaries use `FIXED_TRACK_COACH_TIMEOUT_MS` (15000 ms by default). On timeout the ride keeps running and the coach panel shows an offline/detail message instead of blocking trainer control.
@@ -335,7 +337,7 @@ Use the cog button in the top right of the app to edit these values manually.
 
 ## Local Agent Architecture
 
-The browser owns Bluetooth. Time-sensitive in-ride feedback uses the app-owned `POST /api/coach/live` endpoint, which calls the configured OpenRouter-compatible model directly. For preplanned workouts, the active UI uses this route only for rider-facing text: one ride-start summary and five-minute feedback checks. The workout timeline remains the source of truth for ERG targets.
+The browser owns Bluetooth. Time-sensitive in-ride feedback uses the app-owned `POST /api/coach/live` endpoint, which calls the configured OpenRouter-compatible model directly. For preplanned workouts, the active UI uses this route only for rider-facing text: one ride-start summary and feedback at the workout's cue points (or fixed intervals, if the rider picks them). The workout timeline remains the source of truth for ERG targets.
 
 External agents remain useful for personal fitness tracking: onboarding the rider profile, summarizing saved rides, exporting ride results into another tracking system, and proposing concise `memorySummary` updates from completed rides. They use MCP or HTTP (locally, or on your own domain with the access token) and never speak FTMS or talk to the trainer directly.
 
