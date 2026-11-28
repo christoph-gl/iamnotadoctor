@@ -248,6 +248,24 @@ export async function getWorkoutLibrary(): Promise<{
   }
 }
 
+export type PlannedWorkoutInfo = { workoutId: string; eventTitle: string; start: string; allDay: boolean };
+
+/** Today's planned workout from the rider's calendar (see lib/planned-workout.ts), or null. */
+export async function getPlannedWorkout(): Promise<PlannedWorkoutInfo | null> {
+  if (typeof window === "undefined") return null;
+  try {
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const res = await fetch(`/api/workouts/planned?timeZone=${encodeURIComponent(timeZone)}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const planned = data?.planned;
+    return planned && typeof planned.workoutId === "string" ? planned : null;
+  } catch (e) {
+    console.error("Failed to fetch today's planned workout:", e);
+    return null;
+  }
+}
+
 export const ADAPTIVE_FREERIDE_ID = "adaptive-freeride";
 export const POWER_PROFILE_TEST_ID = "power-profile-test";
 

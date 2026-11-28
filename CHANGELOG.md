@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- Today's planned workout: with `PLANNED_WORKOUTS_ICAL_URL` set to a private iCal calendar address, the player preselects the workout planned for today (rider's local date) on start and marks it **Planned today**. Events match a workout by id or name in their title or description; recurring events, moved and cancelled instances are handled. New endpoint `GET /api/workouts/planned`.
+
 ## [0.7] - 2026-11-24
 
 ### Added
