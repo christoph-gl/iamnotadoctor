@@ -9,6 +9,7 @@ import {
   saveWorkout,
   deleteWorkout,
   getWorkoutLibrary,
+  getPlannedWorkout,
   updateWorkout,
   parseZwoWorkout,
   calculateWorkoutMetrics,
@@ -265,6 +266,9 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
 ) {
   const [allWorkouts, setAllWorkouts] = useState<Workout[]>(WORKOUTS);
   const [workout, setWorkout] = useState<Workout>(WORKOUTS[0]);
+  const [plannedToday, setPlannedToday] = useState<{ workoutId: string; eventTitle: string } | null>(null);
+  const workoutPickedByRiderRef = useRef(false);
+  const isPlayingRef = useRef(false);
 
   useEffect(() => {
     if (onWorkoutChange) {
@@ -272,6 +276,10 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
     }
   }, [workout, onWorkoutChange]);
   const [isPlaying, setIsPlaying] = useState(false);
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+    if (isPlaying) workoutPickedByRiderRef.current = true;
+  }, [isPlaying]);
   const [isUploading, setIsUploading] = useState(false);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [isFinishOpen, setIsFinishOpen] = useState(false);
@@ -689,6 +697,15 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
         }
         return visibleWorkouts[0] ?? ADAPTIVE_FREERIDE;
       });
+
+      // Preselect today's planned workout from the calendar, unless the rider already picked one.
+      const planned = await getPlannedWorkout();
+      if (!planned || workoutPickedByRiderRef.current) return;
+      const plannedWorkout = visibleWorkouts.find((candidate) => candidate.id === planned.workoutId);
+      // Adaptive Freeride needs its setup dialog, so it is never preselected.
+      if (!plannedWorkout || isAdaptiveFreeride(plannedWorkout)) return;
+      setWorkout((currentWorkout) => (isPlayingRef.current ? currentWorkout : plannedWorkout));
+      setPlannedToday({ workoutId: plannedWorkout.id, eventTitle: planned.eventTitle });
     }
     loadSaved();
   }, []);
@@ -909,6 +926,7 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
   };
 
   const selectWorkout = (next: Workout) => {
+    workoutPickedByRiderRef.current = true;
     setWorkout(next);
     if (isPowerProfileTest(next)) {
       onResistanceModeRequest?.(next.resistanceLevel ?? 20);
@@ -1027,6 +1045,7 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
 
       await saveWorkout(parsedWorkout);
       setAllWorkouts(prev => [...prev, parsedWorkout]);
+      workoutPickedByRiderRef.current = true;
       setWorkout(parsedWorkout);
       setUnsavedBuiltWorkoutId(null);
       setBuilderRationale(null);
@@ -1050,6 +1069,7 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
 
       await saveWorkout(parsedWorkout);
       setAllWorkouts(prev => [...prev, parsedWorkout]);
+      workoutPickedByRiderRef.current = true;
       setWorkout(parsedWorkout);
       setUnsavedBuiltWorkoutId(null);
       setBuilderRationale(null);
@@ -1080,6 +1100,7 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
       }
 
       const generatedWorkout = data.workout as Workout;
+      workoutPickedByRiderRef.current = true;
       setWorkout(generatedWorkout);
       setBuilderRationale(typeof data.rationale === "string" ? data.rationale : null);
       setUnsavedBuiltWorkoutId(generatedWorkout.id);
@@ -1955,6 +1976,14 @@ export const WorkoutPlayer = forwardRef<WorkoutPlayerHandle, WorkoutPlayerProps>
               <span className="max-w-[250px] truncate text-sm font-bold">{workout.name}</span>
               <span className="text-xs text-muted-foreground" aria-hidden="true">▾</span>
             </button>
+            {plannedToday?.workoutId === workout.id && (
+              <span
+                className="rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary"
+                title={`From your calendar: ${plannedToday.eventTitle}`}
+              >
+                Planned today
+              </span>
+            )}
             {/* Adaptive Freeride ticker removed */}
             {workout.id.startsWith("imported-") && (
               <button
